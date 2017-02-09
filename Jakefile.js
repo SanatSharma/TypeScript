@@ -80,6 +80,8 @@ var compilerSources = [
     "transformers/module/es2015.ts",
     "transformers/module/system.ts",
     "transformers/module/module.ts",
+    "transformers/wasm/binary.ts",
+    "transformers/wasm/encoder.ts",
     "transformer.ts",
     "sourcemap.ts",
     "comments.ts",

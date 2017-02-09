@@ -31,6 +31,8 @@
         "transformers/module/module.ts",
         "transformers/module/system.ts",
         "transformers/module/es2015.ts",
+        "transformers/wasm/binary.ts",
+        "transformers/wasm/encoder.ts",
         "transformer.ts",
         "comments.ts",
         "sourcemap.ts",
