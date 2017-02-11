@@ -4,7 +4,7 @@
 namespace ts.wasm {
     /**
      * Binary encoder for reading WebAssembly modules.
-     */    
+     */
     export class Decoder {
         private _offset = 0;
 
@@ -15,6 +15,8 @@ namespace ts.wasm {
         private get remaining() {
             return this.buffer.length - this._offset;
         }
+
+        // Data Types
 
         /** Reads the next byte from the underlying buffer, as-is. */
         public uint8() {
@@ -39,9 +41,9 @@ namespace ts.wasm {
         /** Read a LEB128 encoded 32b unsigned integer. */
         public varuint32() {
             let result = 0;                             // Accumulator for decoded result.
-            
-            for (let shift = 0;; shift += 7) {
-                const byte = this.uint8();              // Get the next encoded byte. 
+
+            for (let shift = 0; ; shift += 7) {
+                const byte = this.uint8();              // Get the next encoded byte.
                 result |= ((byte & 0x7F) << shift);     // Copy lower 7 bits into the result.
                 if ((byte & 0x80) === 0) {              // High bit signals if there is more to decode.
                     assert_is_int32(result);            // If done, vet that result is a 32b integer (currently interpretted as signed).
@@ -65,17 +67,17 @@ namespace ts.wasm {
         }
 
         /** Read a LEB128 encoded 32b signed integer. */
-        public varint32() { 
+        public varint32() {
             let result = 0;                                 // Accumulator for decoded result.
             let shift = 0;                                  // Number of bits to shift next encoded byte.
             let byte: number;                               // Byte currently being decoded.
-            
+
             do {
                 byte = this.uint8();                        // Get the next encoded byte.
                 result |= ((byte & 0x7F) << shift);         // Copy lower 7 bits into the result.
                 shift += 7;
             } while (byte >= 0x80);                         // High bit signals there is more to decode.
-            
+
             if ((byte & 0x40) !== 0) {                      // 2nd highest bit indicates the result is negative.
                 if (shift < 32) {                           // So sign extend, unless we ended up with a 5B encoding.
                     result |= (-1) << shift;                // In a 5B encoding, the sign bit is already set in the while..loop
@@ -91,5 +93,23 @@ namespace ts.wasm {
             assert_is_int7(result);
             return result;
         }
+
+        // Language Types
+
+        /** Read a 'type' as a varint7, asserting it is a valid value in the enum. */
+        public type() { return to_type(this.varint7()); }
+
+        /** Read a 'value_type' as a varint7, asserting it is a valid value in the enum. */
+        public value_type() { return to_value_type(this.varint7()); }
+
+        // Other Types
+
+        /** Read an 'external_kind' as a uint8, asserting it is a valid value in the enum. */
+        public external_kind() { return to_external_kind(this.uint8()); }
+
+        // Module Structure
+
+        /** Read a 'section_code' as a varuint7, asserting it is a valid value in the enum. */
+        public section_code() { return to_section_code(this.varuint7()); }
     }
 }

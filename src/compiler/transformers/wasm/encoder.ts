@@ -11,9 +11,12 @@ namespace ts.wasm {
         /** Returns the array of bytes containing the encoded WebAssembly module. */
         public get bytes() { return this.buffer; }
 
+        // Data Types
+
         /** Write the given unsigned 8b integer, as-is. */
         public uint8(u8: number) {
             assert_is_uint8(u8);
+
             this.buffer.push(u8);
         }
 
@@ -53,13 +56,31 @@ namespace ts.wasm {
             for (; s32 < -0x40 || s32 > 0x3F; s32 >>= 7) {      // While more than 6-bits + sign bit remain, emit/remove
                 this.uint8(0x80 | (s32 & 0x7F));                // the next 7-bits with the msb set to indicate more bytes
             }                                                   // remain.
-            this.uint8(s32 & 0x7F);                             // Emit the last 6-bits + sign bit with a clear msb to signal   
+            this.uint8(s32 & 0x7F);                             // Emit the last 6-bits + sign bit with a clear msb to signal
         }                                                       // the end.
 
-        /** Emit a signed 7b integer as LEB128. */
+        /** Write a signed 7b integer as LEB128. */
         public varint7(s7: number) {
             assert_is_int7(s7);
             this.uint8(s7 & 0x7F);                              // (See last byte emitted by 'varint32' above.)
         }
+
+        // Language Types
+
+        /** Write a 'type' as a varint7, asserting it is a valid value in the enum. */
+        public type(type: type) { this.varint7(to_type(type)); }
+
+        /** Write a 'value_type' as a varint7, asserting it is a valid value in the enum. */
+        public value_type(type: value_type) { this.varint7(to_value_type(type)); }
+
+        // Other Types
+
+        /** Write an 'external_kind' as a uint8, asserting it is a valid value in the enum. */
+        public external_kind(kind: external_kind) { this.uint8(to_external_kind(kind)); }
+
+        // Module Structure
+
+        /** Write a 'section_code' as a varuint7, asserting it is a valid value in the enum. */
+        public section_code(code: section_code) { this.varuint7(to_section_code(code)); }
     }
 }

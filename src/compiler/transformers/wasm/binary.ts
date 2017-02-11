@@ -5,6 +5,9 @@
 
 /* @internal */
 namespace ts.wasm {
+
+    // Data Types
+
     /** True if the given number is an integer in the [0..1] range. */
     function is_uint1(value: number) {
         return (value & 0x01) === value;
@@ -63,5 +66,115 @@ namespace ts.wasm {
     /** Asserts that the given number is an integer in the valid uint32 range. */
     export function assert_is_uint32(value: number) {
         Debug.assert(is_uint32(value), "'value' must be a uint32.", () => `got '${value}'`);
+    }
+
+    // Language Types
+
+    /** All types are distinguished by a negative varint7 values that is the first
+        byte of their encoding (representing a type constructor). */
+    export enum type {
+        i32 = -0x01,
+        i64 = -0x02,
+        f32 = -0x03,
+        f64 = -0x04,
+        anyfunc = -0x10,
+        func = -0x20,
+        emptyBlock = -0x40,
+    }
+
+    /** True if the given number is a valid value in the 'type' enum. */
+    export function is_type(value: number) {
+        switch (value) {
+            case type.anyfunc:
+            case type.func:
+            case type.emptyBlock:
+                return true;
+            default:
+                // All remaining 'type' values are members of the 'value_type' subset.
+                return is_value_type(value);
+        }
+    }
+
+    /** Casts the given number to a type, asserting it is a valid enum value. */
+    export function to_type(value: number) {
+        Debug.assert(is_type(value),
+            "'value' must be a valid 'type'.", () => `got '${value}'`);
+        return <type>value;
+    }
+
+    /** A varint7 indicating a value type. */
+    export enum value_type {
+        i32 = type.i32,
+        i64 = type.i64,
+        f32 = type.f32,
+        f64 = type.f64,
+    }
+
+    /** True if the given number is a valid value in the 'value_type' enum. */
+    export function is_value_type(value: number) {
+        // Valid 'value_type' values are consecutive in the [-4..-1] range.
+        return value_type.f64 <= value && value <= value_type.i32;
+    }
+
+    /** Casts the given number to a value_type, asserting it is a valid enum value. */
+    export function to_value_type(value: number) {
+        Debug.assert(is_value_type(value),
+            "'value' must be a valid 'value_type'.", () => `got '${value}'`);
+        return <value_type>value;
+    }
+
+    // Other Types
+
+    /** A single-byte unsigned integer indicating the kind of definition being imported or defined. */
+    export enum external_kind {
+        Function = 0,   // indicating a Function import or definition
+        Table = 1,      // indicating a Table import or definition
+        Memory = 2,     // indicating a Memory import or definition
+        Global = 3,     // indicating a Global import or definition
+    }
+
+    /** True if the given number is a valid value in the 'value_type' enum. */
+    export function is_external_kind(value: number) {
+        // Valid 'external_kind' values are consecutive in the [0..3] range.
+        return external_kind.Function <= value && value <= external_kind.Global;
+    }
+
+    /** Casts the given number to an external_kind, asserting it is a valid enum value. */
+    export function to_external_kind(value: number) {
+        Debug.assert(is_external_kind(value),
+            "'value' must be a valid 'section_code'.", () => `got '${value}'`);
+        return <external_kind>value;
+    }
+
+    // Module Structure
+
+    /** Each section [in a WASM module] is identified by a 1-byte section code that encodes either
+     * a known section or a custom section. */
+    export enum section_code {
+        Custom = 0,
+        Type = 1,       // Function signature declarations
+        Import = 2,     // Import declarations
+        Function = 3,   // Function declarations
+        Table = 4,      // Indirect function table and other tables
+        Memory = 5,     // Memory attributes
+        Global = 6,     // Global declarations
+        Export = 7,     // Exports
+        Start = 8,      // Start function declaration
+        Element = 9,    // Elements section
+        Code = 10,      // Function bodies (code)
+        Data = 11,      // Data segments
+    }
+
+    /** True if the given number is a valid value in the 'section_code' enum. */
+    export function is_section_code(value: number) {
+        // Valid 'section_code' values are consecutive in the [0..11] range.
+        return section_code.Custom <= value && value <= section_code.Data;
+    }
+
+    /** Casts the given number to a section_code, asserting it is a valid enum value. */
+    export function to_section_code(value: number) {
+        Debug.assert(is_section_code(value),
+            "'value' must be a valid 'section_code'.", () => `got '${value}'`);
+        return <section_code>value;
     }
 }
