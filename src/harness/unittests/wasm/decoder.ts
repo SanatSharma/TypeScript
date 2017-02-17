@@ -6,14 +6,14 @@ namespace ts.wasm {
      * Binary encoder for reading WebAssembly modules.
      */
     export class Decoder {
-        private _offset = 0;
+        private offset = 0;
 
         /** Construct a new Decoder instance to read the given buffer. */
         constructor(private buffer: number[]) {}
 
         /** Returns the number of unconsumed bytes remaining in the buffer. */
         private get remaining() {
-            return this.buffer.length - this._offset;
+            return this.buffer.length - this.offset;
         }
 
         // Data Types
@@ -23,11 +23,25 @@ namespace ts.wasm {
             Debug.assert(this.remaining > 0,                    // Bounds-check
                 "Must not read past the end of the buffer.");
 
-            const result = this.buffer[this._offset];           // Get the next available byte.
+            const result = this.buffer[this.offset];            // Get the next available byte.
             assert_is_uint8(result);                            // Sanity check that it is a byte.
-            this._offset++;                                     // Advance to the next byte.
+            this.offset++;                                      // Advance to the next byte.
 
             return result;                                      // Return the result.
+        }
+
+        /** Read the next 'length' number of bytes from the undelying buffer, as-is. */
+        public bytes(length: number) {
+            assert_is_uint32(length);
+            Debug.assert(length <= this.remaining,
+                "Must not index past the end of the buffer.");
+
+            const bytes = this.buffer.slice(this.offset, this.offset + length);
+
+            Debug.assert(bytes.length === length);      // Paranoid check that we sliced off the expected number of bytes.
+            this.offset += length;
+
+            return bytes;
         }
 
         /** Read the next 4 bytes from the underlying buffer, returned as a little-endian unsigned 32b integer. */
@@ -109,7 +123,49 @@ namespace ts.wasm {
 
         // Module Structure
 
+        /** Read the module preamble. */
+        public module_preamble() {
+            const magic_number = this.uint32();             // uint32       Magic number 0x6d736100 (i.e., '\0asm')
+
+            Debug.assert(magic_number === 0x6d736100,
+                "Module preamble must start with 0x6d736100.",
+                () => `got 0x${hex8(magic_number)}.`);
+
+            return new Preamble(this.uint32());      // uint32       Version number
+        }
         /** Read a 'section_code' as a varuint7, asserting it is a valid value in the enum. */
         public section_code() { return to_section_code(this.varuint7()); }
+
+        /** Read the next 'Section' from the module (including the leading 'section_code'.) */
+        public section() {
+            const id = this.varuint7();
+
+            switch (id) {
+                case section_code.Custom:
+                    return this.custom_section();
+
+                default:
+                    Debug.fail(`Unsupported section id '${id}' in module.`);
+            }
+        }
+
+        /** Invoked by 'section()' to read the contents of the custom section.  The leading
+            'secton_code' has already been consumed at this point.*/
+        private custom_section() {
+            const payload_len = this.varuint32()                // varuint32    size of this section in bytes
+
+            const custom_start = this.offset;                   // Remember the offset before name fields, used to calculate
+                                                                // the combined sizeof(name) and sizeof(name_len) below.
+
+            // Note: At this point we know we are decoding a custom section (i.e., id = 0), so
+            //       the following two fields are not optional.
+            const name_len = this.varuint32();                  // varuint32?   length of the section name in bytes, present if id == 0
+            const name = this.bytes(name_len);                  // bytes?       section name string, present if id == 0
+
+            const payload_data = this.bytes(                    // bytes        content of this section, of length
+                payload_len - (this.offset - custom_start));    //              payload_len - sizeof(name) - sizeof(name_len)
+
+            return new CustomSection(name, payload_data);
+        }
     }
 }

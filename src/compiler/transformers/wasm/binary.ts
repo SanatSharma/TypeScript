@@ -5,6 +5,11 @@
 
 /* @internal */
 namespace ts.wasm {
+    /** Return the given number as an 8-digit hexidecimal string. */
+    export function hex8(value: number) {
+        const hex = value.toString(16);
+        return "00000000".substr(-8 + hex.length) + hex;
+    }
 
     // Data Types
 
@@ -148,10 +153,25 @@ namespace ts.wasm {
 
     // Module Structure
 
-    /** Each section [in a WASM module] is identified by a 1-byte section code that encodes either
+    /** The module starts with a preamble  */
+    export class Preamble {
+        readonly magic_number = 0x6d736100;             // Magic number (i.e., '\0asm')
+
+        constructor (readonly version: number) {
+            switch (this.version) {
+                case 0x0d:      // Currently 0xd. The version for MVP will be reset to 1.
+                    break;
+                default:
+                    Debug.fail(`Unsupported version in module preamble: '${version}'`);
+                    break;
+            }
+        }
+    }
+
+    /** Each section [in a WebAssembly module] is identified by a 1-byte section code that encodes either
      * a known section or a custom section. */
     export enum section_code {
-        Custom = 0,
+        Custom = 0,     // Custom
         Type = 1,       // Function signature declarations
         Import = 2,     // Import declarations
         Function = 3,   // Function declarations
@@ -176,5 +196,20 @@ namespace ts.wasm {
         Debug.assert(is_section_code(value),
             "'value' must be a valid 'section_code'.", () => `got '${value}'`);
         return <section_code>value;
+    }
+    /** Base class for WebAssembly module sections */
+    export class Section {
+        constructor (readonly id: section_code) { }
+    }
+
+    /** Custom sections are ignored by the WebAssembly implementation, and thus validation
+        errors within them do not invalidate a module.
+
+        Custom sections all have the same id, and can be named non-uniquely (all bytes composing
+        their names can be identical). */
+    export class CustomSection extends Section {
+        constructor (readonly name: number[], readonly payload_data: number[]) {
+            super(section_code.Custom);
+        }
     }
 }

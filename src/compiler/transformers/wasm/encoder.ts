@@ -6,10 +6,10 @@ namespace ts.wasm {
      * Binary encoder for writting WebAssembly modules.
      */
     export class Encoder {
-        private buffer: number[] = [];
+        private _buffer: number[] = [];
 
         /** Returns the array of bytes containing the encoded WebAssembly module. */
-        public get bytes() { return this.buffer; }
+        public get buffer() { return this._buffer; }
 
         // Data Types
 
@@ -17,7 +17,14 @@ namespace ts.wasm {
         public uint8(u8: number) {
             assert_is_uint8(u8);
 
-            this.buffer.push(u8);
+            this._buffer.push(u8);
+        }
+
+        /** Write the given sequence of bytes, as-is. */
+        public bytes(bytes: number[]) {
+            bytes.forEach(byte => { assert_is_uint8(byte); });
+
+            this._buffer = this._buffer.concat(bytes);
         }
 
         /** Write the given unsigned 32b integer as 4-bytes (little-endian). */
@@ -80,7 +87,38 @@ namespace ts.wasm {
 
         // Module Structure
 
+        /** Write the 'module_preamble'. */
+        public module_preamble(preamble: Preamble) {
+            this.uint32(preamble.magic_number);         // uint32       Magic number 0x6d736100 (i.e., '\0asm')
+            this.uint32(preamble.version);              // uint32       Version number
+        }
+
         /** Write a 'section_code' as a varuint7, asserting it is a valid value in the enum. */
         public section_code(code: section_code) { this.varuint7(to_section_code(code)); }
+
+        /**
+         * Helper that invokes 'getPayload' with a nested 'payloadEncoder' to get the section's payload_data'.
+         * It then writes the given 'id', 'payload_len', and 'payload_data'.  Can be used for custom sections
+         * by including the 'name_len' and 'name' in the 'payload_data'.
+         */
+        private section<T extends Section>(section: T, getPayload: (payloadEncoder: Encoder) => void) {
+            const payload = new Encoder();
+            getPayload(payload);
+
+            this.section_code(section.id);              // varuint7     section code
+            this.varuint32(payload.buffer.length);      // varuint32    size of this section in bytes
+            this.bytes(payload.buffer);                 // (name_len, name, and payload_data)
+        }
+
+        /** Write the given custom section.  */
+        public custom_section(custom: CustomSection) {
+            this.section(custom, encoder => {
+                // Note: At this point we know we are encoding a custom section (i.e., id = 0), so
+                //       the following two fields are not optional.
+                encoder.varuint32(custom.name.length);                 // varuint32?   length of the section name in bytes, present if id == 0
+                encoder.bytes(custom.name);                            // bytes?       section name string, present if id == 0
+                encoder.bytes(custom.payload_data);                    // bytes        content of this section, of length
+            });
+        }
     }
 }
