@@ -64,7 +64,7 @@ namespace ts.wasm {
     }
 
     /** True if the given number is an integer in the [0..4294967295] range. */
-    function is_uint32(value: number) {
+    export function is_uint32(value: number) {
         return (value >>> 0) === value;     // JavaScript idiom to coerce number to unsigned 32b.
     }
 
@@ -126,6 +126,15 @@ namespace ts.wasm {
         Debug.assert(is_value_type(value),
             "'value' must be a valid 'value_type'.", () => `got '${value}'`);
         return <value_type>value;
+    }
+
+    /** The description of a function signature. */
+    export class FuncType {
+        constructor (readonly param_types: value_type[], readonly return_types: value_type[]) {
+            // Note: In the future, return_count and return_type might be generalised to allow multiple values.
+            Debug.assert(0 <= return_types.length && return_types.length <= 1,
+                "'func_type' must have 0 or 1 return values.", () => `got '${return_types.length}'`);
+        }
     }
 
     // Other Types
@@ -210,6 +219,19 @@ namespace ts.wasm {
     export class CustomSection extends Section {
         constructor (readonly name: number[], readonly payload_data: number[]) {
             super(section_code.Custom);
+        }
+    }
+
+    /** The type section declares all function signatures that will be used in the module. */
+    export class TypeSection extends Section {
+        readonly entries: FuncType[] = [];
+
+        constructor () { super(section_code.Type); }
+
+        public add(signature: FuncType) {
+            const index = this.entries.length;
+            this.entries.push(signature);
+            return index;
         }
     }
 }

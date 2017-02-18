@@ -16,6 +16,26 @@ namespace ts.wasm {
             return this.buffer.length - this.offset;
         }
 
+        /** Helper for vetting that an argument with the given 'name' has a non-negative integer 'value'. */
+        private assert_nonnegative_integer(value: number, name: string) {
+            if (!is_uint32(value)) {
+                Debug.fail(`'${name}' must be a non-negative integer.  Got '${value}'.`);
+            }
+        }
+
+        /** Helper used to read a consecutive sequence of type 'T', returned as a T[].  The given
+            'read' function is invoked 'count' times to do the decoding. */
+        private sequenceOf<T>(count: number, read: () => T) {
+            this.assert_nonnegative_integer(count, "count");
+
+            const result: T[] = [];
+            for (let i = count; i > 0; i--) {
+                result.push(read.apply(this));
+            }
+
+            return result;
+        }
+
         // Data Types
 
         /** Reads the next byte from the underlying buffer, as-is. */
@@ -31,15 +51,15 @@ namespace ts.wasm {
         }
 
         /** Read the next 'length' number of bytes from the undelying buffer, as-is. */
-        public bytes(length: number) {
-            assert_is_uint32(length);
-            Debug.assert(length <= this.remaining,
-                "Must not index past the end of the buffer.");
+        public bytes(count: number) {
+            this.assert_nonnegative_integer(count, "count");
+            Debug.assert(count <= this.remaining,
+                "'count' must not exceed the remaining bytes in the buffer.", () => `got '${count}'.`);
 
-            const bytes = this.buffer.slice(this.offset, this.offset + length);
+            const bytes = this.buffer.slice(this.offset, this.offset + count);
 
-            Debug.assert(bytes.length === length);      // Paranoid check that we sliced off the expected number of bytes.
-            this.offset += length;
+            Debug.assert(bytes.length === count);      // Paranoid check that we sliced off the expected number of bytes.
+            this.offset += count;
 
             return bytes;
         }
@@ -116,6 +136,24 @@ namespace ts.wasm {
         /** Read a 'value_type' as a varint7, asserting it is a valid value in the enum. */
         public value_type() { return to_value_type(this.varint7()); }
 
+        /** Invoked by 'type_section()' to read a 'func_type'.  The leading 'form' has already
+            been consumed at this point. */
+        private func_type() {
+            // Note: The leading 'form' type was consumed by 'type_section' in order to dispatch
+            //       to this helper.
+
+            const param_count = this.varuint32();           // varuint32    the number of parameters to the function
+            const param_types = this.sequenceOf(            // value_type*  the parameter types of the function
+                param_count, this.value_type);
+
+            // Note: In the future, return_count and return_type might be generalised to allow multiple values.
+            const return_count = this.varuint1();           // varuint1     the number of results from the function
+            const return_types = this.sequenceOf(           // value_type   the result type of the function (if return_count is 1)
+                return_count, this.value_type);
+
+            return new FuncType(param_types, return_types);
+        }
+
         // Other Types
 
         /** Read an 'external_kind' as a uint8, asserting it is a valid value in the enum. */
@@ -138,22 +176,24 @@ namespace ts.wasm {
 
         /** Read the next 'Section' from the module (including the leading 'section_code'.) */
         public section() {
-            const id = this.varuint7();
+            const id = this.section_code();                 // varuint7     section code
+            const payload_len = this.varuint32();           // varuint32    size of this section in bytes
 
             switch (id) {
                 case section_code.Custom:
-                    return this.custom_section();
+                    return this.custom_section(payload_len);
+
+                case section_code.Type:
+                    return this.type_section();
 
                 default:
                     Debug.fail(`Unsupported section id '${id}' in module.`);
             }
         }
 
-        /** Invoked by 'section()' to read the contents of the custom section.  The leading
-            'secton_code' has already been consumed at this point.*/
-        private custom_section() {
-            const payload_len = this.varuint32()                // varuint32    size of this section in bytes
-
+        /** Invoked by 'section()' to read the payload of the custom section (including the name).
+            The leading 'secton_code' and 'payload_len' have already been consumed at this point. */
+        private custom_section(payload_len: number) {
             const custom_start = this.offset;                   // Remember the offset before name fields, used to calculate
                                                                 // the combined sizeof(name) and sizeof(name_len) below.
 
@@ -166,6 +206,31 @@ namespace ts.wasm {
                 payload_len - (this.offset - custom_start));    //              payload_len - sizeof(name) - sizeof(name_len)
 
             return new CustomSection(name, payload_data);
+        }
+
+        /** Invoked by 'section()' to read the 'payload_data' of the type section.  The leading
+            'secton_code' and 'payload_len' have already been consumed at this point. */
+        private type_section() {
+            const types = new TypeSection();
+
+            const count = this.varuint32();                 // varuint32    count of type entries to follow
+            for (let i = count; i > 0; i--) {               // func_type*   repeated type entries
+                // Per the below note, the intent of the 'form' field in 'func_type' is to distinguish between
+                // future type entries.  Therefore, we decode the 'form' field of the 'func_type' here instead
+                // of inside 'func_type()'.
+                const form = this.varint7();                // varint7      the value for the func type constructor (from 'func_type')
+                switch (form) {
+                    // Note: In the future, this section may contain other forms of type entries as well, which
+                    //       can be distinguished by the form field of the type encoding.
+                    case type.func:
+                        types.add(this.func_type());        // Read the remainder of the 'func_type'.
+                        break;
+                    default:
+                        throw Debug.fail(`Unsupported form '${form}' in type section.`);
+                }
+            }
+
+            return types;
         }
     }
 }

@@ -74,8 +74,8 @@ namespace ts.wasm {
             }
 
             /** Ensures that the given 'original' instance of a Section round-trips through encoding/decoding
-                using the encoding function with the given 'name'.  Succeeds if the decoded copy is deeply
-                equal to the original.  The decoded copy is returned for further verification. */
+                functions with the given 'name'.  Succeeds if the decoded copy is deeply equal to the original.
+                The decoded copy is returned for further verification. */
             function check_section<T extends Section>(name: string, original: T) {
                 const encoder = new Encoder();
 
@@ -167,6 +167,23 @@ namespace ts.wasm {
             describe("language types", () => {
                 check_enum("type");
                 check_enum("value_type");
+
+                describe("func_type", () => {
+                    // Encoding/Decoding of the 'func_type' is verified by the 'type section' round-trip tests.
+                    //
+                    // We do not test Encoding/Decoding of 'func_type' directly because the encoding/decoding is
+                    // unbalanced.  In particular, the 'form' field is written by 'Encoder.func_type()', but is
+                    // presumed to already have been consumed by the time we get to 'Decoder.func_type()'.
+
+                    it("must disallow multiple return values", () => {
+                        assert.throws(() => {
+                            new FuncType(
+                                /* parameters = */ [],
+                                /* returns = */  [ value_type.i32, value_type.i32 ]
+                            );
+                        });
+                    });
+                });
             }); // End language types
 
             describe("other types", () => {
@@ -225,6 +242,41 @@ namespace ts.wasm {
                         check_section("custom_section", new CustomSection(
                             [0x6e, 0x61, 0x6d, 0x65],                       // "name"
                             [0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64]));   // "payload"
+                    });
+                });
+
+                describe("type section", () => {
+                    // Note that this test also serves to cover round-tripping of 'func_type'.  (See notes in 'func_type' test above.)
+                    const signatures = [
+                        new FuncType([], []),                                   // No parameters or return type.
+                        new FuncType([ value_type.f64 ], []),                   // Single parameter, no return type.
+                        new FuncType([], [ value_type.i32 ]),                   // No parameter, returns value.
+                        new FuncType(                                           // Multiple parameters, different return value type.
+                            [ value_type.i64, value_type.f64, value_type.f32, value_type.i32 ],
+                            [ value_type.f64 ])
+                    ];
+
+                    // It would be better to omit the section, but to my knowledge nothing precludes an empty type section.
+                    it(`must round-trip an empty type section`, () => {
+                        check_section("type_section", new TypeSection());
+                    });
+
+                    // Ensure that each of the 'func_type' signatures above round-trip individually.
+                    signatures.forEach(signature => {
+                        it(`must round-trip ${signature.param_types.length} params/${signature.return_types.length} return values`, () => {
+                            const types = new TypeSection();
+                            types.add(signature);
+                            check_section("type_section", types);
+                        });
+                    });
+
+                    // Ensure that the type section round-trips multiple signatures.
+                    it("must round-trip multiple signatures", () => {
+                        const types = new TypeSection();
+                        signatures.forEach(signature => {
+                            types.add(signature);
+                        });
+                        check_section("type_section", types);
                     });
                 });
             }); // End module structure

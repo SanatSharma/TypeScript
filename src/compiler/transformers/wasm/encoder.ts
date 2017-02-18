@@ -80,6 +80,17 @@ namespace ts.wasm {
         /** Write a 'value_type' as a varint7, asserting it is a valid value in the enum. */
         public value_type(type: value_type) { this.varint7(to_value_type(type)); }
 
+        /** Write a 'func_type'. */
+        public func_type(func: FuncType) {
+            this.type(type.func);                                           // varint7      the value for the func type constructor (i.e., type.func)
+            this.varuint32(func.param_types.length);                        // varuint32    the number of parameters to the function
+            func.param_types.forEach(item => this.value_type(item));        // value_type*  the parameter types of the function
+
+            // Note: In the future, return_count and return_type might be generalised to allow multiple values.
+            this.varuint1(func.return_types.length);                        // varuint1     the number of results from the function
+            func.return_types.forEach(item => this.value_type(item));       // value_type   the result type of the function (if return_count is 1)
+        }
+
         // Other Types
 
         /** Write an 'external_kind' as a uint8, asserting it is a valid value in the enum. */
@@ -115,9 +126,18 @@ namespace ts.wasm {
             this.section(custom, encoder => {
                 // Note: At this point we know we are encoding a custom section (i.e., id = 0), so
                 //       the following two fields are not optional.
-                encoder.varuint32(custom.name.length);                 // varuint32?   length of the section name in bytes, present if id == 0
-                encoder.bytes(custom.name);                            // bytes?       section name string, present if id == 0
-                encoder.bytes(custom.payload_data);                    // bytes        content of this section, of length
+                encoder.varuint32(custom.name.length);                  // varuint32?   length of the section name in bytes, present if id == 0
+                encoder.bytes(custom.name);                             // bytes?       section name string, present if id == 0
+                encoder.bytes(custom.payload_data);                     // bytes        content of this section, of length
+            });
+        }
+
+        /** Write the given type section. */
+        public type_section(types: TypeSection) {
+            this.section(types, encoder => {
+                encoder.varuint32(types.entries.length);                // varuint32    count of type entries to follow
+                types.entries.forEach(                                  // func_type*   repeated type entries
+                    signature => encoder.func_type(signature));
             });
         }
     }
