@@ -73,6 +73,14 @@ namespace ts.wasm {
         Debug.assert(is_uint32(value), "'value' must be a uint32.", () => `got '${value}'`);
     }
 
+    /** Wrapper around Debug.assert() to provide a helper assertion message for invalid enum values.
+        'name' is the name of the enum type.  'predicate' is the function used to test the validity
+        of the 'value'. */
+    function assert_valid_enum_value<T>(name: string, predicate: (value: T) => boolean, value: T) {
+        Debug.assert(predicate(value),
+            "'value' must be a valid member of the enumeration.", () => `'${value}' is not a member of ${name}.`);
+    }
+
     // Language Types
 
     /** All types are distinguished by a negative varint7 values that is the first
@@ -102,8 +110,7 @@ namespace ts.wasm {
 
     /** Casts the given number to a type, asserting it is a valid enum value. */
     export function to_type(value: number) {
-        Debug.assert(is_type(value),
-            "'value' must be a valid 'type'.", () => `got '${value}'`);
+        assert_valid_enum_value("type", is_type, value);
         return <type>value;
     }
 
@@ -123,8 +130,7 @@ namespace ts.wasm {
 
     /** Casts the given number to a value_type, asserting it is a valid enum value. */
     export function to_value_type(value: number) {
-        Debug.assert(is_value_type(value),
-            "'value' must be a valid 'value_type'.", () => `got '${value}'`);
+        assert_valid_enum_value("value_type", is_value_type, value);
         return <value_type>value;
     }
 
@@ -155,8 +161,7 @@ namespace ts.wasm {
 
     /** Casts the given number to an external_kind, asserting it is a valid enum value. */
     export function to_external_kind(value: number) {
-        Debug.assert(is_external_kind(value),
-            "'value' must be a valid 'section_code'.", () => `got '${value}'`);
+        assert_valid_enum_value("external_kind", is_external_kind, value);
         return <external_kind>value;
     }
 
@@ -202,8 +207,7 @@ namespace ts.wasm {
 
     /** Casts the given number to a section_code, asserting it is a valid enum value. */
     export function to_section_code(value: number) {
-        Debug.assert(is_section_code(value),
-            "'value' must be a valid 'section_code'.", () => `got '${value}'`);
+        assert_valid_enum_value("section_code", is_section_code, value);
         return <section_code>value;
     }
     /** Base class for WebAssembly module sections */
@@ -247,6 +251,32 @@ namespace ts.wasm {
             const functionIndex = this.types.length;
             this.types.push(index);
             return functionIndex;
+        }
+    }
+
+    /** Each export has three fields: a name, whose meaning is defined by the host environment, a type,
+        indicating whether the export is a function, global, memory or table, and an index into the
+        type’s corresponding index space. */
+    export class ExportEntry {
+        readonly kind: external_kind;
+
+        /** For example, if the “kind” is Function, then “index” is a function index. */
+        constructor (readonly name: string, kind: external_kind, readonly index: number) {
+            assert_is_uint32(index);
+            this.kind = to_external_kind(kind);     // Assert that 'kind' is a valid enum value.
+            Debug.assert(index === 0 || kind !== external_kind.Global && kind !== external_kind.Memory,
+                "In the MVP, the only valid index value for a memory or table export is 0.");
+        }
+    }
+
+    /** A sequence of exports which are returned at instantiation time to the host environment. */
+    export class ExportSection extends Section {
+        readonly entries: ExportEntry[] = [];
+
+        constructor () { super(section_code.Export); }
+
+        public add(entry: ExportEntry) {
+            this.entries.push(entry);
         }
     }
 

@@ -128,6 +128,22 @@ namespace ts.wasm {
             return result;
         }
 
+        /** Read a byte-length prefixed UTF-8 encoded string. */
+        public utf8() {
+            const length = this.varuint32();
+            let result = "";
+
+            this.bytes(length).forEach(ch => {
+                // TODO: Support full UTF-8.
+                //       https://github.com/DLehenbauer/TypeScript/issues/2
+                Debug.assert(ch < 0x80,
+                    "Full UTF-8 support is not yet implemented.");
+                result += String.fromCharCode(ch);
+            });
+
+            return result;
+        }
+
         // Language Types
 
         /** Read a 'type' as a varint7, asserting it is a valid value in the enum. */
@@ -189,6 +205,9 @@ namespace ts.wasm {
                 case section_code.Function:
                     return this.function_section();
 
+                case section_code.Export:
+                    return this.export_section();
+
                 default:
                     Debug.fail(`Unsupported section id '${id}' in module.`);
             }
@@ -245,6 +264,25 @@ namespace ts.wasm {
             const result = new FunctionSection();
             types.forEach(type => result.add(type));
             return result;
+        }
+        /** Invoked by 'section()' to read the 'payload_data' of the export section.  The leading
+            'secton_code' and 'payload_len' have already been consumed at this point. */
+        private export_section() {
+            const count = this.varint32();                              // varuint32        count of export entries to follow
+            const entries = this.sequenceOf(count, this.export_entry);  // export_entry*    repeated export entries
+
+            const result = new ExportSection();
+            entries.forEach(entry => result.add(entry));
+            return result;
+        }
+
+        /** Invoked by 'export_section()' to read each 'export_entry'. */
+        private export_entry() {
+            return new ExportEntry(
+                this.utf8(),                                // varuint32        field name string length
+                                                            // bytes            field name string of field_len bytes
+                this.external_kind(),                       // external_kind    the kind of definition being exported
+                this.varuint32());                          // varuint32        the index into the corresponding index space
         }
     }
 }

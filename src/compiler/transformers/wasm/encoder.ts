@@ -72,6 +72,24 @@ namespace ts.wasm {
             this.uint8(s7 & 0x7F);                              // (See last byte emitted by 'varint32' above.)
         }
 
+        /** Write a byte-length prefixed UTF-8 encoded string. */
+        public utf8(str: string) {
+            const encoder = new Encoder();
+            const numCodeUnits = str.length;
+
+            for (let i = 0; i < numCodeUnits; i++) {
+                const codeUnit = str.charCodeAt(i);
+                // TODO: Support full UTF-8.
+                //       https://github.com/DLehenbauer/TypeScript/issues/2
+                Debug.assert(codeUnit < 0x80,
+                    "Full UTF-8 support is not yet implemented.");
+                encoder.uint8(codeUnit);
+            }
+
+            this.varuint32(encoder.buffer.length);      // varuint32       byte length of following utf8 encoded string.
+            this.bytes(encoder.buffer);                 // bytes           utf8 encoded string.
+        }
+
         // Language Types
 
         /** Write a 'type' as a varint7, asserting it is a valid value in the enum. */
@@ -148,6 +166,23 @@ namespace ts.wasm {
                     encoder.varuint32(type);
                 });
             });
+        }
+
+        /** Write the given 'export section'. */
+        public export_section(section: ExportSection) {
+            this.section(section, encoder => {
+                encoder.varint32(section.entries.length);               // varuint32        count of export entries to follow
+                section.entries.forEach(                                // export_entry*    repeated export entries
+                    item => encoder.export_entry(item));
+            });
+        }
+
+        /** Invoked by 'export_section()' to write the given 'export_entry'. */
+        private export_entry(entry: ExportEntry) {
+            this.utf8(entry.name);      // field_len       varuint32        field name string length
+                                        // field_str       bytes            field name string of field_len bytes
+            this.external_kind(entry.kind);             // external_kind    the kind of definition being exported
+            this.varuint32(entry.index);                // varuint32        the index into the corresponding index space
         }
 
     }

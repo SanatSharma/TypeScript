@@ -3,6 +3,8 @@
 /// <reference path="../../../compiler/transformers/wasm/encoder.ts" />
 
 namespace ts.wasm {
+    const uint32_max = 0xFFFFFFFF;
+
     /** Returns an array containing the values of 'numbers' in ascending order. */
     function sort(numbers: number[]) {
         return numbers.sort((left, right) => left - right);
@@ -42,6 +44,14 @@ namespace ts.wasm {
                 }
             }
 
+            function getEnumMembers<T>(fixture: T) {
+                // Get the set of defined values for the enum.
+                return Object.keys(fixture)                             // For each enumerable property of the enum Object,
+                    .map(key => {                                       //   get the property name / value pair.
+                        return { name: key, value: (<any>fixture)[key] }})
+                    .filter(entry => typeof entry.value === "number");  // Keep only entries whose values are of type number
+            }
+
             /**
              * For the enum type with the specified 'name', ensures that all defined values correctly
              * round-trip through encoding/decoding.  Also sanity checks that values just outside the
@@ -60,9 +70,8 @@ namespace ts.wasm {
                     const is_valid: (value: number) => boolean = (<any>ts.wasm)["is_" + name];
 
                     // Get the set of defined values for the enum.
-                    const values = Object.keys(fixture)                             // For each enumerable property of the enum Object,
-                        .map(key => fixture[key])                                   //   get the value for each property name
-                        .filter(value => typeof value === "number") as number[];    //   keeping only values that are of type number.
+                    const values = getEnumMembers(fixture)
+                        .map(entry => entry.value);
 
                     const cases = sort(values.concat(
                         min(values) - 1,                            // Also test a value that is one less that smallest given value.
@@ -86,6 +95,28 @@ namespace ts.wasm {
 
                 const decoder = new Decoder(encoder.buffer);
                 const replica = decoder.section();
+
+                assert.deepEqual(original, replica);
+
+                return replica;
+            }
+
+            /** Ensures that the given 'original' instance of a Section round-trips through encoding/decoding
+                functions with the given 'name'.  Succeeds if the decoded copy is deeply equal to the original.
+                The decoded copy is returned for further verification. */
+            function check_type<T>(name: string, original: T) {
+                const encoder = new Encoder();
+
+                // Lookup the encode function we want to test by 'name'.
+                const encode: (section: T) => void = ((<any>encoder)[name]).bind(encoder);
+
+                encode(original);
+
+                const decoder = new Decoder(encoder.buffer);
+
+                // Lookup the decode functions we want to test by 'name'.
+                const decode: () => number = ((<any>decoder)[name]).bind(decoder);
+                const replica = decode();
 
                 assert.deepEqual(original, replica);
 
@@ -282,7 +313,7 @@ namespace ts.wasm {
 
                 describe("function section", () => {
                     // Ensure that sections with 0, 1, and 2 indices round-trip as expected.
-                    [[], [0], [0, 0xFFFFFFFF]].forEach(indices => {
+                    [[], [0], [0, uint32_max]].forEach(indices => {
                         it(`must round-trip section with ${indices.length} type indices`, () => {
                             const functions = new FunctionSection();
                             indices.forEach(index => functions.add(index));
@@ -290,6 +321,59 @@ namespace ts.wasm {
                         });
                     });
                 });
+
+                {
+                    const validCases = [
+                        { description: "an empty 'name'", name: "", kind: external_kind.Function, index: 0 },
+                        { description: "uint32 index", name: "", kind: external_kind.Function, index: uint32_max },
+                    ].concat(
+                        getEnumMembers(external_kind).map(entry => {
+                            return { description: `external_kind.${entry.name}`, name: entry.name, kind: entry.value, index: 0 }
+                    }));
+
+                    describe("export_entry", () => {
+                        // Ensure that each valid case can be constructed / round-trips.
+                        validCases.forEach(testCase => {
+                            it(`must permit ${testCase.description}`, () => {
+                                check_type("export_entry", new ExportEntry(testCase.name, testCase.kind, testCase.index));
+                            });
+                        });
+
+                        // Ensure that index must be 0 with Memory/Global kinds.
+                        [external_kind.Memory, external_kind.Global].forEach(kind => {
+                            it(`must require an index 0 for ${external_kind[kind]}`, () => {
+                                assert.throws(() => {
+                                    new ExportEntry("", kind, 1);
+                                }, "the only valid index value");
+                            })
+                        })
+                    });
+
+                    describe("export section", () => {
+                        // It would be better to omit the section, but to my knowledge nothing precludes an empty section.
+                        it(`must round-trip with zero entries`, () => {
+                            check_section("export_section", new ExportSection());
+                        });
+
+                        // Ensure that export_section round-trips with each case individually.
+                        validCases.forEach(testCase => {
+                            it(`must round-trip ${testCase.description}`, () => {
+                                const section = new ExportSection();
+                                section.add(new ExportEntry(testCase.name, testCase.kind, testCase.index));
+                                check_section("export_section", section);
+                            });
+                        });
+
+                        // Ensure that export_section round-trips with multiple entries.
+                        it(`must round-trip with multiple entries`, () => {
+                            const section = new ExportSection();
+                            validCases.forEach(testCase => {
+                                section.add(new ExportEntry(testCase.name, testCase.kind, testCase.index));
+                            });
+                            check_section("export_section", section);
+                        });
+                    });
+                }
             }); // End module structure
         });
     });
