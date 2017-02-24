@@ -208,6 +208,9 @@ namespace ts.wasm {
                 case section_code.Export:
                     return this.export_section();
 
+                case section_code.Code:
+                    return this.code_section();
+
                 default:
                     Debug.fail(`Unsupported section id '${id}' in module.`);
             }
@@ -283,6 +286,48 @@ namespace ts.wasm {
                                                             // bytes            field name string of field_len bytes
                 this.external_kind(),                       // external_kind    the kind of definition being exported
                 this.varuint32());                          // varuint32        the index into the corresponding index space
+        }
+
+        /** Invoked by 'section()' to read the 'payload_data' of the code section.  The leading
+            'secton_code' and 'payload_len' have already been consumed at this point. */
+        public code_section() {
+            const code = new CodeSection();
+
+            const count = this.varuint32();                 // varuint32        count of function bodies to follow
+            for (let i = count; i > 0; i--) {               // function_body*   sequence of Function Bodies
+                code.add(this.function_body());
+            }
+
+            return code;
+        }
+
+        // Function Bodies
+
+        /** Invoked by 'code_section()' to read each 'function_body'. */
+        private function_body() {
+            const body_size = this.varuint32();                     // varuint32        size of function body to follow, in bytes
+
+            // Used to calculate the remaining bytes for the 'code' field below.
+            const startLocals = this.offset;
+
+            const local_count = this.varuint32();                   // varuint32    number of local entries
+            const locals = this.sequenceOf(                         // local_entry* local variables
+                local_count, this.local_entry);
+
+            // Calculate the remaining bytes in the 'function_body' entry to determine how many
+            // bytes to read for the 'code' field.
+            const localsSize = (this.offset - startLocals);
+            const code = this.bytes(body_size - localsSize);        // byte*            bytecode of the function
+                                                                    // byte             0x0b, indicating the end of the body
+
+            return new FunctionBody(locals, code);                  // Asserts that 'code' terminates with 0x0b.
+        }
+
+        /** Invoked by 'function_body()' to read each 'local_entry'. */
+        private local_entry() {
+            return new LocalEntry(
+                this.varuint32(),
+                this.varint7());
         }
     }
 }

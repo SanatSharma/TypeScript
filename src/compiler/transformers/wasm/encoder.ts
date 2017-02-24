@@ -185,5 +185,40 @@ namespace ts.wasm {
             this.varuint32(entry.index);                // varuint32        the index into the corresponding index space
         }
 
+        /** Write the given 'code section'. */
+        public code_section(section: CodeSection) {
+            this.section(section, encoder => {
+                encoder.varuint32(section.bodies.length);                       // varuint32        count of function bodies to follow
+                section.bodies.forEach(body => encoder.function_body(body));    // function_body*   sequence of Function Bodies
+            });
+        }
+
+        // Function Bodies
+
+        /** Invoked by 'code_section()' to write the given 'function_body'. */
+        private function_body(body: FunctionBody) {
+            // To calculate the byte length of the function body, we encode the         // varuint32        size of function body to follow, in bytes
+            // payload into a seperate Encoder instance which is then concatenated
+            // to this instance.
+            const payload = new Encoder();
+
+            payload.varuint32(body.locals.length);                                      // varuint32        number of local entries
+            body.locals.forEach(item => payload.local_entry(item));                     // local_entry*     local variables
+            payload.bytes(body.code);                                                   // byte*            bytecode of the function
+
+            Debug.assert(payload.buffer[payload.buffer.length - 1] === opcode.end,      // byte             0x0b, indicating the end of the body
+                "'code' must terminate with the 'end' opcode (0x0b).",
+                () => `got '0x${hex2(payload.buffer[payload.buffer.length - 1])}.`);
+
+            this.varuint32(payload.buffer.length);                                      // See above: byte size of function body
+            this.bytes(payload.buffer);                                                 // See above: local_count, locals, code
+        }
+
+        /** Invoked by 'function_body()' to write the given 'local_entry'. */
+        private local_entry(entry: LocalEntry) {
+            this.varuint32(entry.count);    // varuint32    number of local variables of the following type
+            this.value_type(entry.type);    // value_type   type of the variables
+        }
+
     }
 }

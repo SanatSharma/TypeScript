@@ -5,8 +5,18 @@
 
 /* @internal */
 namespace ts.wasm {
+    /** Return the given number as a 2-digit hexidecimal string. */
+    export function hex2(value: number) {
+        Debug.assert(is_int32(value) || is_uint32(value),
+            "'value' must be an 8b signed or unsigned integer.", () => `got '${value}'`);
+        const hex = value.toString(16);
+        return "00".substr(-2 + hex.length) + hex;
+    }
+
     /** Return the given number as an 8-digit hexidecimal string. */
     export function hex8(value: number) {
+        Debug.assert(is_int32(value) || is_uint32(value),
+            "'value' must be a 32b signed or unsigned integer.", () => `got '${value}'`);
         const hex = value.toString(16);
         return "00000000".substr(-8 + hex.length) + hex;
     }
@@ -183,7 +193,7 @@ namespace ts.wasm {
     }
 
     /** Each section [in a WebAssembly module] is identified by a 1-byte section code that encodes either
-     * a known section or a custom section. */
+        a known section or a custom section. */
     export enum section_code {
         Custom = 0,     // Custom
         Type = 1,       // Function signature declarations
@@ -280,4 +290,44 @@ namespace ts.wasm {
         }
     }
 
+    /** The code section contains a body for every function in the module. The count of functions
+        declared in the function section and function bodies defined in this section must be the
+        same and the ith declaration corresponds to the ith function body. */
+    export class CodeSection extends Section {
+        readonly bodies: FunctionBody[] = [];       // function_body*   sequence of Function Bodies
+
+        constructor () { super(section_code.Code); }
+
+        public add(body: FunctionBody) {
+            this.bodies.push(body);
+        }
+    }
+
+    // Function Bodies
+
+    /** Function bodies consist of a sequence of local variable declarations followed by bytecode instructions.
+        It is legal to have several local entries with the same type.  Each function body must end with the end
+        opcode. */
+    export class FunctionBody {
+        constructor (readonly locals: LocalEntry[], readonly code: number[]) {
+            Debug.assert(code.length > 0,
+                "'code' must terminate with the 'end' opcode (0x0b).  got zero bytes.");
+            Debug.assert(code[code.length - 1] === opcode.end,
+                "'code' must terminate with the 'end' opcode (0x0b).", () => `got '0x${hex2(code[code.length - 1])}'`);
+        }
+    }
+
+    /** Each local entry declares a number of local variables of a given type. */
+    export class LocalEntry {
+        readonly type: value_type;
+        constructor (readonly count: number, type: value_type) {
+            assert_is_uint32(count);
+            this.type = to_value_type(type);    // Assert 'type' is a valid 'value_type'.
+        }
+    }
+
+    export enum opcode {
+        end             = 0x0b,     //                                  end a block, loop, or if
+        return          = 0x0f,     //                                  return zero or one value from this function
+    }
 }

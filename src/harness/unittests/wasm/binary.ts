@@ -345,8 +345,8 @@ namespace ts.wasm {
                                 assert.throws(() => {
                                     new ExportEntry("", kind, 1);
                                 }, "the only valid index value");
-                            })
-                        })
+                            });
+                        });
                     });
 
                     describe("export section", () => {
@@ -371,6 +371,78 @@ namespace ts.wasm {
                                 section.add(new ExportEntry(testCase.name, testCase.kind, testCase.index));
                             });
                             check_section("export_section", section);
+                        });
+                    });
+                }
+
+                {
+                    // The shortest valid block of byte-code, which simply returns void.
+                    const nop = [ opcode.end ];
+
+                    const validBodies = [{
+                        description: "no locals",                               // Ensure zero locals are premitted.
+                        locals: [],
+                        code: nop
+                    }].concat(getEnumMembers(value_type).map(                   // Ensure each local type round-trips individually.
+                        member => { return {
+                            description: `a local of type ${member.name}`,
+                            locals: [new LocalEntry(1, member.value)],
+                            code: nop
+                        }}
+                    )).concat([                                                 // Ensure all local types round-trip together.
+                        {
+                            description: "multiple local types",
+                            locals: getEnumMembers(value_type).map(member => new LocalEntry(1, member.value)),
+                            code: nop
+                        },
+                        {
+                            description: "a local with count > 1",              // Ensure 'count' really goes up to uint32 max.
+                            locals: [new LocalEntry(uint32_max, value_type.i32)],
+                            code: nop
+                        }
+                    ]);
+
+                    describe("function bodies", () => {
+                        // Ensure each of the valid function bodies above round-trip.
+                        validBodies.forEach(body => {
+                            it(`must allow ${body.description}`, () => {
+                                check_type("function_body", new FunctionBody(body.locals, body.code));
+                            });
+                        });
+
+                        it("must require code section terminates with end opcode (0x0b)", () => {
+                            assert.throw(() => {
+                                new FunctionBody([], []);
+                            }, "0x0b");
+
+                            assert.throw(() => {
+                                new FunctionBody([], [ opcode.return ]);
+                            }, "0x0b");
+                        });
+                    });
+
+                    describe("code section", () => {
+                        // It would be better to omit the section, but to my knowledge nothing precludes an empty section.
+                        it(`must round-trip with zero entries`, () => {
+                            check_section("code_section", new CodeSection());
+                        });
+
+                        // Ensure that code_section round-trips with each of the function bodies above.
+                        validBodies.forEach(body => {
+                            it(`must round-trip ${body.description}`, () => {
+                                const section = new CodeSection();
+                                section.add(new FunctionBody(body.locals, body.code));
+                                check_section("code_section", section);
+                            });
+                        });
+
+                        // Ensure a single code_section round-trips with all of the function bodies above.
+                        it(`must round-trip multiple functions`, () => {
+                            const section = new CodeSection();
+                            validBodies.forEach(body => {
+                                section.add(new FunctionBody(body.locals, body.code));
+                            });
+                            check_section("code_section", section);
                         });
                     });
                 }
