@@ -234,4 +234,20 @@ namespace ts.wasm {
             return index;
         }
     }
+    /** The function section declares the signatures of all functions in the module (their
+        definitions appear in the code section). */
+    export class FunctionSection extends Section {
+        readonly types: number[] = [];      // varuint32*   sequence of indices into the type section
+
+        constructor () { super(section_code.Function); }
+
+        /** @param index Index of signature in types section */
+        public add(index: number) {
+            assert_is_uint32(index);
+            const functionIndex = this.types.length;
+            this.types.push(index);
+            return functionIndex;
+        }
+    }
+
 }

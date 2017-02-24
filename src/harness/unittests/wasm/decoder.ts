@@ -186,6 +186,9 @@ namespace ts.wasm {
                 case section_code.Type:
                     return this.type_section();
 
+                case section_code.Function:
+                    return this.function_section();
+
                 default:
                     Debug.fail(`Unsupported section id '${id}' in module.`);
             }
@@ -231,6 +234,17 @@ namespace ts.wasm {
             }
 
             return types;
+        }
+
+        /** Invoked by 'section()' to read the 'payload_data' of the function section.  The leading
+            'secton_code' and 'payload_len' have already been consumed at this point. */
+        private function_section() {
+            const count = this.varint32();                          // varuint32    count of signature indices to follow
+            const types = this.sequenceOf(count, this.varuint32);   // varuint32*   sequence of indices into the type section
+
+            const result = new FunctionSection();
+            types.forEach(type => result.add(type));
+            return result;
         }
     }
 }

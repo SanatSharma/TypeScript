@@ -279,6 +279,17 @@ namespace ts.wasm {
                         check_section("type_section", types);
                     });
                 });
+
+                describe("function section", () => {
+                    // Ensure that sections with 0, 1, and 2 indices round-trip as expected.
+                    [[], [0], [0, 0xFFFFFFFF]].forEach(indices => {
+                        it(`must round-trip section with ${indices.length} type indices`, () => {
+                            const functions = new FunctionSection();
+                            indices.forEach(index => functions.add(index));
+                            check_section("function_section", functions);
+                        });
+                    });
+                });
             }); // End module structure
         });
     });

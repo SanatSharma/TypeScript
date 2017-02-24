@@ -140,5 +140,15 @@ namespace ts.wasm {
                     signature => encoder.func_type(signature));
             });
         }
+        /** Write the given function section. */
+        public function_section(section: FunctionSection) {
+            this.section(section, encoder => {
+                encoder.varuint32(section.types.length);                // varuint32    count of signature indices to follow
+                section.types.forEach(type => {                         // varuint32*   sequence of indices into the type section
+                    encoder.varuint32(type);
+                });
+            });
+        }
+
     }
 }
