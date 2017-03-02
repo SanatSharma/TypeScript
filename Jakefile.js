@@ -329,7 +329,7 @@ function compileFile(outFile, sources, prereqs, prefixes, useBuiltCompiler, opts
             options += " --stripInternal";
         }
 
-        options += " --target es5 --lib es5,scripthost --noUnusedLocals --noUnusedParameters";
+        options += " --target es5 --lib es5 --noUnusedLocals --noUnusedParameters";
 
         var cmd = host + " " + compilerPath + " " + options + " ";
         cmd = cmd + sources.join(" ");
