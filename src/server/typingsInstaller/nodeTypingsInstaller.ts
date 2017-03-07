@@ -46,7 +46,7 @@ namespace ts.server.typingsInstaller {
         }
         try {
             const content = <TypesRegistryFile>JSON.parse(host.readFile(typesRegistryFilePath));
-            return createMap<void>(content.entries);
+            return createMapFromTemplate<void>(content.entries);
         }
         catch (e) {
             if (log.isEnabled()) {
@@ -61,9 +61,7 @@ namespace ts.server.typingsInstaller {
         return combinePaths(normalizeSlashes(globalTypingsCacheLocation), `node_modules/${TypesRegistryPackageName}/index.json`);
     }
 
-    type ExecSync = {
-        (command: string, options: { cwd: string, stdio?: "ignore" }): any
-    }
+    type ExecSync = (command: string, options: { cwd: string, stdio?: "ignore" }) => any;
 
     export class NodeTypingsInstaller extends TypingsInstaller {
         private readonly execSync: ExecSync;

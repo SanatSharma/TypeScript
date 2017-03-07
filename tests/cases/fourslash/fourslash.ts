@@ -43,6 +43,16 @@
 // TODO: figure out a better solution to the API exposure problem.
 
 declare module ts {
+    export type MapKey = string | number;
+    export interface Map<T> {
+        forEach(action: (value: T, key: string) => void): void;
+        get(key: MapKey): T;
+        has(key: MapKey): boolean;
+        set(key: MapKey, value: T): this;
+        delete(key: MapKey): boolean;
+        clear(): void;
+    }
+
     interface SymbolDisplayPart {
         text: string;
         kind: string;
@@ -82,6 +92,7 @@ declare namespace FourSlashInterface {
         InsertSpaceAfterFunctionKeywordForAnonymousFunctions: boolean;
         InsertSpaceAfterOpeningAndBeforeClosingNonemptyParenthesis: boolean;
         InsertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets: boolean;
+        InsertSpaceAfterOpeningAndBeforeClosingNonemptyBraces: boolean;
         InsertSpaceAfterOpeningAndBeforeClosingTemplateStringBraces: boolean;
         InsertSpaceAfterTypeAssertion: boolean;
         PlaceOpenBraceOnNewLineForFunctions: boolean;
@@ -103,11 +114,14 @@ declare namespace FourSlashInterface {
         markerNames(): string[];
         marker(name?: string): Marker;
         ranges(): Range[];
-        rangesByText(): { [text: string]: Range[] };
+        rangesByText(): ts.Map<Range[]>;
         markerByName(s: string): Marker;
     }
     class goTo {
-        marker(name?: string): void;
+        marker(name?: string | Marker): void;
+        eachMarker(action: () => void): void;
+        rangeStart(range: Range): void;
+        eachRange(action: () => void): void;
         bof(): void;
         eof(): void;
         implementation(): void;
@@ -169,25 +183,27 @@ declare namespace FourSlashInterface {
         goToType(startMarkerNames: string | string[], endMarkerNames: string | string[]): void;
         verifyGetEmitOutputForCurrentFile(expected: string): void;
         verifyGetEmitOutputContentsForCurrentFile(expected: ts.OutputFile[]): void;
+        noReferences(markerNameOrRange?: string | Range): void;
         /**
-         * Asserts that the given ranges are the references from the current position.
-         * If ranges have markers, those markers may have "isDefinition" and "isWriteAccess" data
-         * (otherwise these properties pf the reference are not tested).
-         * Order of ranges does not matter.
-         */
-        referencesAre(ranges: Range[]): void;
-        /**
+         * @deprecated, prefer 'referenceGroups'
          * Like `referencesAre`, but goes to `start` first.
          * `start` should be included in `references`.
          */
         referencesOf(start: Range, references: Range[]): void;
+        /**
+         * For each of startRanges, asserts the ranges that are referenced from there.
+         * This uses the 'findReferences' command instead of 'getReferencesAtPosition', so references are grouped by their definition.
+         */
+        referenceGroups(startRanges: Range | Range[], parts: Array<{ definition: string, ranges: Range[] }>): void;
+        singleReferenceGroup(definition: string, ranges?: Range[]): void;
+        rangesAreOccurrences(isWriteAccess?: boolean): void;
+        rangesAreRenameLocations(findInStrings?: boolean, findInComments?: boolean): void;
         /**
          * Performs `referencesOf` for every range on the whole set.
          * If `ranges` is omitted, this is `test.ranges()`.
          */
         rangesReferenceEachOther(ranges?: Range[]): void;
         findReferencesDefinitionDisplayPartsAtCaretAre(expected: ts.SymbolDisplayPart[]): void;
-        rangesWithSameTextReferenceEachOther(): void;
         currentParameterHelpArgumentNameIs(name: string): void;
         currentParameterSpanIs(parameter: string): void;
         currentParameterHelpArgumentDocCommentIs(docComment: string): void;
@@ -210,7 +226,7 @@ declare namespace FourSlashInterface {
         noMatchingBracePositionInCurrentFile(bracePosition: number): void;
         DocCommentTemplate(expectedText: string, expectedOffset: number, empty?: boolean): void;
         noDocCommentTemplate(): void;
-        rangeAfterCodeFix(expectedText: string, errorCode?: number): void;
+        rangeAfterCodeFix(expectedText: string, includeWhiteSpace?: boolean, errorCode?: number, index?: number): void;
         importFixAtPosition(expectedTextArray: string[], errorCode?: number): void;
 
         navigationBar(json: any): void;
@@ -219,8 +235,8 @@ declare namespace FourSlashInterface {
         navigationItemsListContains(name: string, kind: string, searchValue: string, matchKind: string, fileName?: string, parentName?: string): void;
         occurrencesAtPositionContains(range: Range, isWriteAccess?: boolean): void;
         occurrencesAtPositionCount(expectedCount: number): void;
-        documentHighlightsAtPositionContains(range: Range, fileNamesToSearch: string[], kind?: string): void;
-        documentHighlightsAtPositionCount(expectedCount: number, fileNamesToSearch: string[]): void;
+        rangesAreDocumentHighlights(ranges?: Range[]): void;
+        rangesWithSameTextAreDocumentHighlights(): void;
         completionEntryDetailIs(entryName: string, text: string, documentation?: string, kind?: string): void;
         /**
          * This method *requires* a contiguous, complete, and ordered stream of classifications for a file.

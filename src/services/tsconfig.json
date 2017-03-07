@@ -3,8 +3,7 @@
     "compilerOptions": {
         "removeComments": false,
         "outFile": "../../built/local/typescriptServices.js",
-        "declaration": true,
-        "types": []
+        "declaration": true
     },
     "files": [
         "../compiler/core.ts",
@@ -54,10 +53,12 @@
         "navigateTo.ts",
         "navigationBar.ts",
         "outliningElementsCollector.ts",
+        "pathCompletions.ts",
         "patternMatcher.ts",
         "preProcess.ts",
         "rename.ts",
         "services.ts",
+        "transform.ts",
         "transpile.ts",
         "shims.ts",
         "signatureHelp.ts",
@@ -79,11 +80,13 @@
         "formatting/smartIndenter.ts",
         "formatting/tokenRange.ts",
         "codeFixProvider.ts",
+        "codefixes/fixAddMissingMember.ts",
         "codefixes/fixExtendsInterfaceBecomesImplements.ts",
         "codefixes/fixClassIncorrectlyImplementsInterface.ts",
         "codefixes/fixClassDoesntImplementInheritedAbstractMember.ts",
         "codefixes/fixClassSuperMustPrecedeThisAccess.ts",
         "codefixes/fixConstructorForDerivedNeedSuperCall.ts",
+        "codefixes/fixForgottenThisPropertyAccess.ts",
         "codefixes/fixes.ts",
         "codefixes/helpers.ts",
         "codefixes/importFixes.ts",
