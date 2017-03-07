@@ -3,7 +3,7 @@
 /* @internal */
 namespace ts.wasm {
     /**
-     * Binary encoder for writting WebAssembly modules.
+     * Binary encoder for writing WebAssembly modules.
      */
     export class Encoder {
         private _buffer: number[] = [];
@@ -104,7 +104,7 @@ namespace ts.wasm {
             this.varuint32(func.param_types.length);                        // varuint32    the number of parameters to the function
             func.param_types.forEach(item => this.value_type(item));        // value_type*  the parameter types of the function
 
-            // Note: In the future, return_count and return_type might be generalised to allow multiple values.
+            // Note: In the future, return_count and return_type might be generalized to allow multiple values.
             this.varuint1(func.return_types.length);                        // varuint1     the number of results from the function
             func.return_types.forEach(item => this.value_type(item));       // value_type   the result type of the function (if return_count is 1)
         }
@@ -198,7 +198,7 @@ namespace ts.wasm {
         /** Invoked by 'code_section()' to write the given 'function_body'. */
         private function_body(body: FunctionBody) {
             // To calculate the byte length of the function body, we encode the         // varuint32        size of function body to follow, in bytes
-            // payload into a seperate Encoder instance which is then concatenated
+            // payload into a separate Encoder instance which is then concatenated
             // to this instance.
             const payload = new Encoder();
 

@@ -5,7 +5,7 @@
 
 /* @internal */
 namespace ts.wasm {
-    /** Return the given number as a 2-digit hexidecimal string. */
+    /** Return the given number as a 2-digit hexadecimal string. */
     export function hex2(value: number) {
         Debug.assert(is_int32(value) || is_uint32(value),
             "'value' must be an 8b signed or unsigned integer.", () => `got '${value}'`);
@@ -13,7 +13,7 @@ namespace ts.wasm {
         return "00".substr(-2 + hex.length) + hex;
     }
 
-    /** Return the given number as an 8-digit hexidecimal string. */
+    /** Return the given number as an 8-digit hexadecimal string. */
     export function hex8(value: number) {
         Debug.assert(is_int32(value) || is_uint32(value),
             "'value' must be a 32b signed or unsigned integer.", () => `got '${value}'`);
@@ -147,7 +147,7 @@ namespace ts.wasm {
     /** The description of a function signature. */
     export class FuncType {
         constructor (readonly param_types: value_type[], readonly return_types: value_type[]) {
-            // Note: In the future, return_count and return_type might be generalised to allow multiple values.
+            // Note: In the future, return_count and return_type might be generalized to allow multiple values.
             Debug.assert(0 <= return_types.length && return_types.length <= 1,
                 "'func_type' must have 0 or 1 return values.", () => `got '${return_types.length}'`);
         }
