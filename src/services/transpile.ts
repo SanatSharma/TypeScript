@@ -76,6 +76,13 @@
         const compilerHost: CompilerHost = {
             getSourceFile: (fileName) => fileName === normalizePath(inputFileName) ? sourceFile : undefined,
             writeFile: (name, text) => {
+                // TODO: Investigate language services support for '--target wasm'.
+                //       https://github.com/DLehenbauer/TypeScript/issues/3
+                if (typeof text !== "string") {
+                    Debug.fail(`Unexpected binary output for file '${name}'.`)
+                    return;
+                }
+
                 if (fileExtensionIs(name, ".map")) {
                     Debug.assert(sourceMapText === undefined, `Unexpected multiple source map outputs for the file '${name}'`);
                     sourceMapText = text;

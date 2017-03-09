@@ -7,7 +7,7 @@ namespace ts {
             it(name, () => {
                 const roots = sources.map(source => createSourceFile(source.file, source.text, ScriptTarget.ES2015));
                 const fileMap = arrayToMap(roots, file => file.fileName);
-                const outputs = createMap<string>();
+                const outputs = createMap<string | number[]>();
                 const options: CompilerOptions = {};
                 const host: CompilerHost = {
                     getSourceFile: (fileName) => fileMap.get(fileName),
@@ -29,7 +29,7 @@ namespace ts {
                     for (const [file, text] of arrayFrom(outputs.entries())) {
                         if (content) content += "\n\n";
                         content += `// [${file}]\n`;
-                        content += text;
+                        content += text;                    // If 'data' is a number[], it is coerced into a comma separated list of value.
                     }
                     return content;
                 });

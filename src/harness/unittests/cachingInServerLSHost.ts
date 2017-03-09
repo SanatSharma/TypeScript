@@ -47,7 +47,7 @@ namespace ts {
             clearTimeout,
             setImmediate: typeof setImmediate !== "undefined" ? setImmediate : action => setTimeout(action, 0),
             clearImmediate: typeof clearImmediate !== "undefined" ? clearImmediate : clearTimeout,
-            createHash: s => s
+            createHash: (data: string | number[]) => "" + data      // If 'data' is a number[], it is coerced into a comma separated list of value.
         };
     }
 

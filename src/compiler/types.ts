@@ -2300,8 +2300,9 @@
         readFile(path: string): string;
     }
 
+    /** Signature of 'writeFile()' for CompilerHost, EmitHost, and ScriptReferenceHost. */
     export interface WriteFileCallback {
-        (fileName: string, data: string, writeByteOrderMark: boolean, onError?: (message: string) => void, sourceFiles?: SourceFile[]): void;
+        (fileName: string, data: string | number[], writeByteOrderMark: boolean, onError?: (message: string) => void, sourceFiles?: SourceFile[]): void;
     }
 
     export class OperationCanceledException { }

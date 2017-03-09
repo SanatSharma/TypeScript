@@ -25,7 +25,7 @@ namespace ts.server {
         clearTimeout: noop,
         setImmediate: () => 0,
         clearImmediate: noop,
-        createHash: s => s
+        createHash: (data: string | number[]) => "" + data      // If 'data' is a number[], it is coerced into a comma separated list of value.
     };
 
     const mockLogger: Logger = {

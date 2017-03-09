@@ -479,7 +479,7 @@ namespace Harness {
         useCaseSensitiveFileNames(): boolean;
         resolvePath(path: string): string;
         readFile(path: string): string;
-        writeFile(path: string, contents: string): void;
+        writeFile(path: string, contents: string | number[]): void;
         directoryName(path: string): string;
         getDirectories(path: string): string[];
         createDirectory(path: string): void;

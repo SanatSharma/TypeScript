@@ -19,7 +19,11 @@ namespace ts {
         write(s: string): void;
         readFile(path: string, encoding?: string): string;
         getFileSize?(path: string): number;
-        writeFile(path: string, data: string, writeByteOrderMark?: boolean): void;
+        /**
+         * Writes the given 'data' at the specified 'path'.  If 'data' is a string, writes a text file
+         * with optional BOM.  If 'data' is a number[], writes a binary file.
+         */
+        writeFile(path: string, data: string | number[], writeByteOrderMark?: boolean): void;
         /**
          * @pollingInterval - this parameter is used in polling-based watchers and ignored in watchers that
          * use native OS file watching
@@ -35,7 +39,11 @@ namespace ts {
         getDirectories(path: string): string[];
         readDirectory(path: string, extensions?: string[], exclude?: string[], include?: string[]): string[];
         getModifiedTime?(path: string): Date;
-        createHash?(data: string): string;
+        /**
+         * Returns a non-cryptographic hash of the given 'data', suitable for determining when a file's contents
+         * have changed.  'data' may be a string, or a number[] containing the bytes of a binary file.
+         */
+        createHash?(data: string | number[]): string;
         getMemoryUsage?(): number;
         exit(exitCode?: number): void;
         realpath?(path: string): string;
@@ -104,6 +112,16 @@ namespace ts {
             const _crypto = require("crypto");
 
             const useNonPollingWatchers = process.env["TSC_NONPOLLING_WATCHER"];
+
+            /** Node.js 'Buffer' type used internally when hashing and writing binary files. */
+            interface Buffer {
+                from(bytes: number[]): Buffer;
+            }
+
+            /** Used by createHash() and writeFile() to convert a number[] to a NodeBuffer. */
+            function toNodeBuffer(bytes: number[]) {
+                return (<Buffer>global.Buffer).from(bytes)
+            }
 
             function createWatchedFileSet() {
                 const dirWatchers = createMap<DirectoryWatcher>();
@@ -222,17 +240,25 @@ namespace ts {
                 return buffer.toString("utf8");
             }
 
-            function writeFile(fileName: string, data: string, writeByteOrderMark?: boolean): void {
-                // If a BOM is required, emit one
-                if (writeByteOrderMark) {
-                    data = "\uFEFF" + data;
-                }
-
+            function writeFile(fileName: string, data: string | number[], writeByteOrderMark?: boolean): void {
                 let fd: number;
 
                 try {
                     fd = _fs.openSync(fileName, "w");
-                    _fs.writeSync(fd, data, undefined, "utf8");
+
+                    // Discriminate between writing a UTF-8 text file or a binary file.
+                    if (typeof data === "string") {
+                        // If text file requires a BOM, emit one.
+                        if (writeByteOrderMark) {
+                            data = "\uFEFF" + data;
+                        }
+                        _fs.writeSync(fd, data, undefined, "utf8");
+                    } else {
+                        // Otherwise, we're writing a binary file and 'data' must be a number[].
+                        Debug.assert(!writeByteOrderMark,
+                            "Must not set 'writeByteOrderMark' for a binary file.");
+                        _fs.writeSync(fd, toNodeBuffer(data));
+                    }
                 }
                 finally {
                     if (fd !== undefined) {
@@ -401,9 +427,12 @@ namespace ts {
                         return undefined;
                     }
                 },
-                createHash(data) {
+                createHash(data: string | number[]) {
                     const hash = _crypto.createHash("md5");
-                    hash.update(data);
+                    hash.update(
+                        typeof data === "string"            // hash.update() will accept a string as-is, but
+                            ? data                          // a number[] needs to first be converted to a
+                            : toNodeBuffer(data));          // Node.js 'Buffer' type.
                     return hash.digest("hex");
                 },
                 getMemoryUsage() {
