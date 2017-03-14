@@ -1749,6 +1749,26 @@ namespace ts {
                 });
             }
 
+            if (getIsEmittingWasm(options)) {
+                // Reject command line options that are unsupported when targeting wasm.
+                [
+                    { option: options.module, name: "module" },
+                ].forEach(forbidden => {
+                    if (typeof forbidden.option !== "undefined") {
+                        programDiagnostics.add(createCompilerDiagnostic(Diagnostics.Option_0_cannot_be_specified_when_option_1_is_2, forbidden.name, "target", "wasm"));
+                    }
+                });
+
+                // Ensure that command line options required when targeting wasm are specified.
+                [
+                    { option: options.outFile, name: "outFile" },
+                ].forEach(required => {
+                    if (typeof required.option === "undefined") {
+                        programDiagnostics.add(createCompilerDiagnostic(Diagnostics.Option_0_must_be_specified_when_option_1_is_2, required.name, "target", "wasm"));
+                    }
+                });
+            }
+
             // Verify that all the emit files are unique and don't overwrite input files
             function verifyEmitFilePath(emitFileName: string, emitFilesSeen: FileMap<boolean>) {
                 if (emitFileName) {

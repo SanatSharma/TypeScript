@@ -1671,6 +1671,11 @@ namespace Harness {
             return ts.endsWith(fileName, ".js.map") || ts.endsWith(fileName, ".jsx.map");
         }
 
+        /** True if the the given 'fileName' extension indicates it is a wasm module. */
+        export function isWasm(fileName: string) {
+            return ts.endsWith(fileName, ".wasm");
+        }
+
         /** Contains the code and errors of a compilation and some helper methods to check its status. */
         export class CompilerResult {
             public files: GeneratedFile[] = [];
@@ -1689,6 +1694,10 @@ namespace Harness {
                     }
                     else if (isJS(emittedFile.fileName) || isJSX(emittedFile.fileName)) {
                         // .js file, add to files
+                        this.files.push(emittedFile);
+                    }
+                    else if (isWasm(emittedFile.fileName)) {
+                        // .wasm module, add to files.
                         this.files.push(emittedFile);
                     }
                     else if (isJSMap(emittedFile.fileName)) {

@@ -272,8 +272,10 @@ namespace ts {
                 "es2016": ScriptTarget.ES2016,
                 "es2017": ScriptTarget.ES2017,
                 "esnext": ScriptTarget.ESNext,
+                "wasm": ScriptTarget.Wasm,
             }),
-            description: Diagnostics.Specify_ECMAScript_target_version_Colon_ES3_default_ES5_ES2015_ES2016_ES2017_or_ESNEXT,
+            description: Diagnostics.
+            Specify_target_Colon_ECMAScript_version_ES3_default_ES5_ES2015_ES2016_ES2017_ESNEXT_or_WebAssembly_module_Wasm,
             paramType: Diagnostics.VERSION,
         },
         {

@@ -3410,15 +3410,6 @@ namespace ts {
         unresolvedImports: ReadonlyArray<string>;       // List of unresolved module ids from imports
     }
 
-    export enum ModuleKind {
-        None = 0,
-        CommonJS = 1,
-        AMD = 2,
-        UMD = 3,
-        System = 4,
-        ES2015 = 5,
-    }
-
     export const enum JsxEmit {
         None = 0,
         Preserve = 1,
@@ -3449,6 +3440,7 @@ namespace ts {
     }
 
     export const enum ScriptTarget {
+        // Use positive indices for script targets.
         ES3 = 0,
         ES5 = 1,
         ES2015 = 2,
@@ -3456,6 +3448,22 @@ namespace ts {
         ES2017 = 4,
         ESNext = 5,
         Latest = ESNext,
+
+        // Use negative indices for wasm corresponding to the targeted module version.
+        Wasm = -0x0d,           // Latest supported version (0x0d).
+    }
+
+    export enum ModuleKind {
+        // Use positive indices for script module kinds.
+        None = 0,
+        CommonJS = 1,
+        AMD = 2,
+        UMD = 3,
+        System = 4,
+        ES2015 = 5,
+
+        // For wasm, the ModuleKind is equal to the module version being targeted.
+        Wasm = ScriptTarget.Wasm,
     }
 
     export const enum LanguageVariant {

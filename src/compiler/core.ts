@@ -1459,10 +1459,26 @@ namespace ts {
         return compilerOptions.target || ScriptTarget.ES3;
     }
 
+    /**
+     * True if emitting wasm instead of script.  We use this helper rather than inlining comparison with
+     * 'getEmitScriptTarget()' in anticipation of future wasm versions.
+     */
+    export function getIsEmittingWasm(compilerOptions: CompilerOptions) {
+        return getEmitScriptTarget(compilerOptions) === ScriptTarget.Wasm;
+    }
+
+    /**
+     * Returns the effective 'ModuleKind'.  If '--module' was not explicitly set at the command line,
+     * returns ES2015, CommonJS, or appropriate wasm module version as implied by the script target.
+     */
     export function getEmitModuleKind(compilerOptions: CompilerOptions) {
-        return typeof compilerOptions.module === "number" ?
-            compilerOptions.module :
-            getEmitScriptTarget(compilerOptions) >= ScriptTarget.ES2015 ? ModuleKind.ES2015 : ModuleKind.CommonJS;
+        return typeof compilerOptions.module === "number"                       // If '--module' was specified, return the ModuleKind
+            ? compilerOptions.module                                            //   given on the command line.
+            : getEmitScriptTarget(compilerOptions) >= ScriptTarget.ES2015       // If emitting ES2015+, the ModuleKind is implicitly
+                ? ModuleKind.ES2015                                             //   'ES2015'.
+                : getIsEmittingWasm(compilerOptions)                            // If emitting wasm, the ModuleKind is equal to the
+                    ? <ModuleKind>(<any>(compilerOptions.target))               //   version of WebAssembly being targeted.
+                    : ModuleKind.CommonJS;                                      // Otherwise, the ModuleKind is assumed to be CommonJS.
     }
 
     export function getEmitModuleResolutionKind(compilerOptions: CompilerOptions) {

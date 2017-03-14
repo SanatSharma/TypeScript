@@ -3,6 +3,7 @@
 /// <reference path="declarationEmitter.ts" />
 /// <reference path="sourcemap.ts" />
 /// <reference path="comments.ts" />
+/// <reference path="transformers/wasm/wasm.ts" />
 
 namespace ts {
     const delimiters = createDelimiterMap();
@@ -51,7 +52,16 @@ namespace ts {
 
         // Emit each output file
         performance.mark("beforePrint");
-        forEachEmittedFile(host, emitSourceFileOrBundle, transform.transformed, emitOnlyDtsFiles);
+        if (getEmitModuleKind(compilerOptions) !== ModuleKind.Wasm) {
+            forEachEmittedFile(host, emitSourceFileOrBundle, transform.transformed, emitOnlyDtsFiles);
+        }
+        else {
+            // TODO: This currently just writes the minimum 8B module consisting of the magic number
+            //       followed by the version.
+            const encoder = new ts.wasm.Encoder();
+            encoder.module_preamble(new ts.wasm.Preamble(/* version: */ 0x0d));
+            host.writeFile(compilerOptions.outFile, encoder.buffer, false);
+        }
         performance.measure("printTime", "beforePrint");
 
         // Clean up emit nodes on parse tree
