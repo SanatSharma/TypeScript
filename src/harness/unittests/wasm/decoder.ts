@@ -183,7 +183,7 @@ namespace ts.wasm {
 
             Debug.assert(magic_number === 0x6d736100,
                 "Module preamble must start with 0x6d736100.",
-                () => `got 0x${hex8(magic_number)}.`);
+                () => `got 0x${hex32(magic_number)}.`);
 
             return new Preamble(this.uint32());      // uint32       Version number
         }

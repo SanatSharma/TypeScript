@@ -20,7 +20,117 @@ namespace ts.wasm {
         return numbers.reduce((left, right) => Math.max(left, right));
     }
 
+    interface numeric_type {
+        signed: boolean;
+        bits: number;
+        variable?: boolean;
+    }
+
+    const numeric_types = [                 // Description of the various numeric types.
+        { signed: false, bits: 1 },         //
+        { signed: false, bits: 7 },         // bits:       Number of bits (prior to encoding).
+        { signed: false, bits: 8 },         // signed:     True if signed, otherwise unsigned.
+        { signed: false, bits: 32 },
+        { signed: true, bits: 7 },
+        { signed: true, bits: 32 }
+    ];
+
+    const encoding_types = [                                // Description of the various numeric encoding types.
+        { variable: false, signed: false, bits: 8 },        //
+        { variable: false, signed: false, bits: 32 },       //  variable:   True if LEB128 encoded, otherwise LE.
+        { variable: true, signed: false, bits: 1 },         //  signed:     True if signed, otherwise unsigned.
+        { variable: true, signed: false, bits: 7 },         //  bits:       Number of bits (prior to encoding).
+        { variable: true, signed: false, bits: 32 },
+        { variable: true, signed: true, bits: 7 },
+        { variable: true, signed: true, bits: 32 }
+    ];
+
+    /** Calculates the name for a numeric type (e.g., 'varuint7') based on the given description. */
+    function numeric_type_name(type: numeric_type) {
+        return (type.variable        //   If the encoding is variable length, add the "var" prefix.
+                ? "var"
+                : "") +
+            (type.signed             //   If the type is signed, add "int".  Otherwise "uint".
+                ? "int"
+                : "uint") +
+            type.bits;               //   Append the number of bits.
+    }
+
+    /** Calculates the minimum and maximum values that can be represented by a signed or
+        unsigned integer type with the given number of 'bits'. */
+    function numeric_type_bounds(type: numeric_type) {
+        // Note: Use Math.pow() to calculate powers of 2 to avoid pitfall of left-shifting
+        //       a 32b integer by 32.
+        return {
+            min: type.signed                            // Calculate the lower bound for the given number of bits.
+                ? -Math.pow(2, type.bits - 1)           //   Lower bound of a signed integer is 2^(N-1)
+                : 0,                                    //   Lower bound of an unsigned integer is always 0.
+            max: type.signed                            // Calculate the upper bound for the given number of bits.
+                ? Math.pow(2, type.bits - 1) - 1        //   Upper bound of a signed integer is 2^(N-1) - 1.
+                : Math.pow(2, type.bits) - 1            //   Upper bound of an unsigned integer is 2^N - 1.
+
+        }
+    }
+
     describe("wasm", () => {
+        describe("utilities", () => {
+            describe("numeric", () => {
+                describe("hexadecimal pretty-printing", () => {
+                    [
+                        { value: 10, expected2: "0a", expected8: "0000000a" },      // Must be padded with leading zeros
+                        { value: 255, expected2: "ff", expected8: "000000ff" },     // Only 32b pads with leading zeros
+                        { value: -1, expected2: "ff", expected8: "ffffffff" },      // Must be coerced to unsigned
+                    ].forEach(testCase => {
+                        it(`${testCase.value} formatted to 2 digits`, () => {
+                            assert.equal(hex8(testCase.value), testCase.expected2);
+                        });
+                        it(`${testCase.value} formatted to 8 digits`, () => {
+                            assert.equal(hex32(testCase.value), testCase.expected8);
+                        });
+                    });
+
+                    // hex8() must reject out-of-range and non-integer values
+                    [-129, 0.5, 256].forEach(value => {
+                        it(`2 digit formatting must reject value '${value}'.`, () => {
+                            assert.throws(() => {
+                                hex8(value);
+                            }, "'value' must be");
+                        });
+                    });
+
+                    // hex32() must reject out-of-range and non-integer values
+                    [-2147483649, 0.5, 4294967296].forEach(value => {
+                        it(`8 digit formatting must reject value '${value}'.`, () => {
+                            assert.throws(() => {
+                                hex32(value);
+                            }, "'value' must be");
+                        });
+                    });
+                });
+
+                describe("type detection", () => {
+                    numeric_types.forEach(type => {
+                        const fn_name = "is_" + numeric_type_name(type);
+                        describe(fn_name, () => {
+                            const is_valid: (value: number) => boolean = (<any>ts.wasm)[fn_name];
+                            const bounds = numeric_type_bounds(type);
+
+                            [bounds.min, bounds.max].forEach(value => {
+                                it(`must accept in-range value '${value}'`, () => {
+                                    assert.isTrue(is_valid(value));
+                                });
+                            });
+                            [bounds.min - 1, bounds.max + 1].forEach(value => {
+                                it(`must reject out-of-range value '${value}'`, () => {
+                                    assert.isFalse(is_valid(value));
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+
         describe("binary encoding", () => {
             /**
              * If the given 'value' passes the 'is_valid' predicate, checks that the value
@@ -124,16 +234,6 @@ namespace ts.wasm {
             }
 
             describe("data types", () => {
-                const numeric_types = [                                 // Description of the various numeric types/encodings
-                    { variable: false, signed: false, bits: 8 },        //
-                    { variable: false, signed: false, bits: 32 },       //  variable:   True if LEB128 encoded, otherwise LE.
-                    { variable: true, signed: false, bits: 1 },         //  signed:     True if signed, otherwise unsigned.
-                    { variable: true, signed: false, bits: 7 },         //  bits:       Number of bits (prior to encoding).
-                    { variable: true, signed: false, bits: 32 },
-                    { variable: true, signed: true, bits: 7 },
-                    { variable: true, signed: true, bits: 32 }
-                ];
-
                 // Points at which signed and unsigned LEB128 encoding extends to an extra byte.
                 // (e.g., 0x3F is the largest signed value that LEB128 can encode as a single byte)
                 const leb128Cases = [
@@ -153,15 +253,9 @@ namespace ts.wasm {
                     .concat(leb128Cases.map(value => -value - 2))       // ...and maximum negative value for each encoded length.
                     .concat([-1, 0, 1]);
 
-                numeric_types.forEach(type => {
-                    const name =            // Calculate the name of the encode fn for the current type (e.g., 'varuint7')
-                        (type.variable      //   If the encoding is variable lenght, add the "var" prefix.
-                            ? "var"
-                            : "") +
-                        (type.signed        //   If the type is signed, add "int".  Otherwise "uint".
-                            ? "int"
-                            : "uint") +
-                        type.bits;          //   Append the number of bits.
+                encoding_types.forEach(type => {
+                    // Calculate the name of the encode fn for the current type (e.g., 'varuint7')
+                    const name = numeric_type_name(type);
 
                     describe(name, () => {
                         // Create a pair of encoder/decoders to test that we can round-trip values as expected.
@@ -172,23 +266,15 @@ namespace ts.wasm {
                         const encode: (value: number) => void = ((<any>encoder)[name]).bind(encoder);
                         const decode: () => number = ((<any>decoder)[name]).bind(decoder);
 
-                        // Note: Use Math.pow() to calculate powers of 2 to avoid pitfall of left-shifting
-                        //       a 32b integer by 32.
-                        const lowerBound = type.signed                                  // Calculate the lower bound for the given number of bits.
-                            ? -Math.pow(2, type.bits - 1)                               //   Lower bound of a signed integer is 2^(N-1)
-                            : 0;                                                        //   Lower bound of an unsigned integer is always 0.
-                        const upperBound = type.signed                                  // Calculate the upper bound for the given number of bits.
-                            ? Math.pow(2, type.bits - 1) - 1                            //   Upper bound of a signed integer is 2^(N-1) - 1.
-                            : Math.pow(2, type.bits) - 1                                //   Upper bound of an unsigned integer is 2^N - 1.
-
-                        const is_valid = (value: number) => lowerBound <= value && value <= upperBound;
+                        const bounds = numeric_type_bounds(type);
+                        const is_valid = (value: number) => bounds.min <= value && value <= bounds.max;
 
                         const cases =
                             sort((type.signed                                           // Select the signed or unsigned test cases.
                                 ? signedCases
                                 : unsignedCases)
-                            .concat([lowerBound - 1, lowerBound])                       //   and add values that straddle the lower and
-                            .concat([upperBound, upperBound + 1]));                     //   upper bounds.
+                            .concat([bounds.min - 1, bounds.min])                       //   and add values that straddle the lower and
+                            .concat([bounds.max, bounds.max + 1]));                     //   upper bounds.
 
                         cases.forEach(value => check_numeric(value, is_valid, encode, decode)); // Ensure that each value correctly round-trips.
                     });
@@ -227,15 +313,15 @@ namespace ts.wasm {
                     const version = 0x0d;                                   // Current version number, will reset to 1 for MVP.
 
                     it("constructor must require a supported version number", () => {
-                        const preamble = new Preamble(version);      // A valid version number must be accepted.
+                        const preamble = new Preamble(version);             // A valid version number must be accepted.
                         assert.equal(preamble.version, version);
 
                         assert.throws(() => {                               // An invalid version number must be rejected.
                             new Preamble(0xBADADABA);
-                        }, "Unsupported version");
+                        }, "Unsupported WebAssembly version");
                     });
 
-                    it("must start with magic namber followed by version", () => {
+                    it("must start with magic number followed by version", () => {
                         const encoder = new Encoder();
                         encoder.module_preamble(new Preamble(version));
 
@@ -258,7 +344,7 @@ namespace ts.wasm {
                         const decoder = new Decoder(magic_number.concat([0xBA, 0xDA, 0xDA, 0xBA]));
                         assert.throws(() => {
                             decoder.module_preamble();
-                        }, "Unsupported version");
+                        }, "Unsupported WebAssembly version");
                     });
                 });
 

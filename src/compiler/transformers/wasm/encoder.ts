@@ -208,7 +208,7 @@ namespace ts.wasm {
 
             Debug.assert(payload.buffer[payload.buffer.length - 1] === opcode.end,      // byte             0x0b, indicating the end of the body
                 "'code' must terminate with the 'end' opcode (0x0b).",
-                () => `got '0x${hex2(payload.buffer[payload.buffer.length - 1])}.`);
+                () => `got '0x${hex32(payload.buffer[payload.buffer.length - 1])}.`);
 
             this.varuint32(payload.buffer.length);                                      // See above: byte size of function body
             this.bytes(payload.buffer);                                                 // See above: local_count, locals, code

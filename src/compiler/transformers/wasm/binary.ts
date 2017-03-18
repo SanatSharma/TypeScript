@@ -5,26 +5,26 @@
 
 /* @internal */
 namespace ts.wasm {
-    /** Return the given number as a 2-digit hexadecimal string. */
-    export function hex2(value: number) {
-        Debug.assert(is_int32(value) || is_uint32(value),
+    /** Return the given number as an 8-bit/2-digit hexadecimal string. */
+    export function hex8(value: number) {
+        Debug.assert(is_int8(value) || is_uint8(value),
             "'value' must be an 8b signed or unsigned integer.", () => `got '${value}'`);
-        const hex = value.toString(16);
-        return "00".substr(-2 + hex.length) + hex;
+        const hex = (value & 0xFF).toString(16);
+        return "00".substr(hex.length) + hex;
     }
 
-    /** Return the given number as an 8-digit hexadecimal string. */
-    export function hex8(value: number) {
+    /** Return the given number as a 32-bit/8-digit hexadecimal string. */
+    export function hex32(value: number) {
         Debug.assert(is_int32(value) || is_uint32(value),
             "'value' must be a 32b signed or unsigned integer.", () => `got '${value}'`);
-        const hex = value.toString(16);
-        return "00000000".substr(-8 + hex.length) + hex;
+        const hex = (value >>> 0).toString(16);
+        return "00000000".substr(hex.length) + hex;
     }
 
     // Data Types
 
     /** True if the given number is an integer in the [0..1] range. */
-    function is_uint1(value: number) {
+    export function is_uint1(value: number) {
         return (value & 0x01) === value;
     }
 
@@ -34,7 +34,7 @@ namespace ts.wasm {
     }
 
     /** True if the given number is an integer in the [0..127] range. */
-    function is_uint7(value: number) {
+    export function is_uint7(value: number) {
         return (value & 0x7F) === value;
     }
 
@@ -44,8 +44,9 @@ namespace ts.wasm {
     }
 
     /** True if the given number is an integer in the [-64..63] range. */
-    function is_int7(value: number) {
-        return -0x40 <= value && value <= 0x3F;
+    export function is_int7(value: number) {
+        return ((value | 0) === value)              // Ensure 'value' is an integer
+            && -0x40 <= value && value <= 0x3F;     //   and in the 7b range.
     }
 
     /** Asserts that the given number is an integer in the valid int7 range. */
@@ -53,8 +54,14 @@ namespace ts.wasm {
         Debug.assert(is_int7(value), "'value' must be a int7.", () => `got '${value}'`);
     }
 
+    /** True if the given number is an integer in the [-128..127] range. */
+    export function is_int8(value: number) {
+        return ((value | 0) === value)              // Ensure 'value' is an integer
+            && -128 <= value && value <= 127;       //   and in the 8b range.
+    }
+
     /** True if the given number is an integer in the [0..255] range. */
-    function is_uint8(value: number) {
+    export function is_uint8(value: number) {
         return (value & 0xFF) === value;
     }
 
@@ -64,7 +71,7 @@ namespace ts.wasm {
     }
 
     /** True if the given number is an integer in the [-2147483648..2147483647] range. */
-    function is_int32(value: number) {
+    export function is_int32(value: number) {
         return (value | 0) === value;       // JavaScript idiom to coerce number to signed 32b.
     }
 
@@ -186,7 +193,7 @@ namespace ts.wasm {
                 case 0x0d:      // Currently 0xd. The version for MVP will be reset to 1.
                     break;
                 default:
-                    Debug.fail(`Unsupported version in module preamble: '${version}'`);
+                    Debug.fail(`Unsupported WebAssembly version in module preamble: '0x${hex32(version)}'`);
                     break;
             }
         }
@@ -313,7 +320,7 @@ namespace ts.wasm {
             Debug.assert(code.length > 0,
                 "'code' must terminate with the 'end' opcode (0x0b).  got zero bytes.");
             Debug.assert(code[code.length - 1] === opcode.end,
-                "'code' must terminate with the 'end' opcode (0x0b).", () => `got '0x${hex2(code[code.length - 1])}'`);
+                "'code' must terminate with the 'end' opcode (0x0b).", () => `got '0x${hex8(code[code.length - 1])}'`);
         }
     }
 
