@@ -98,6 +98,13 @@ namespace ts.wasm {
             "'value' must be a valid member of the enumeration.", () => `'${value}' is not a member of ${name}.`);
     }
 
+    // Instruction Opcodes
+
+    /** Asserts that the given 'op' is a valid opcode. */
+    export function assert_is_opcode(op: opcode) {
+        assert_valid_enum_value("opcode", value => opcode[value] !== undefined, op);
+    }
+
     // Language Types
 
     /** All types are distinguished by a negative varint7 values that is the first

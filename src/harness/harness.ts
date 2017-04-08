@@ -21,6 +21,7 @@
 /// <reference path="sourceMapRecorder.ts"/>
 /// <reference path="runnerbase.ts"/>
 /// <reference path="virtualFileSystem.ts" />
+/// <reference path="unittests/wasm/disassembler.ts" />
 /// <reference types="node" />
 /// <reference types="mocha" />
 /// <reference types="chai" />
@@ -879,7 +880,7 @@ namespace Harness {
 
         export function createCompilerHost(
             inputFiles: TestFile[],
-            writeFile: (fn: string, contents: string, writeByteOrderMark: boolean) => void,
+            writeFile: (fn: string, contents: string | number[], writeByteOrderMark: boolean) => void,
             scriptTarget: ts.ScriptTarget,
             useCaseSensitiveFileNames: boolean,
             // the currentDirectory is needed for rwcRunner to passed in specified current directory to compiler host
@@ -1170,7 +1171,14 @@ namespace Harness {
 
             const compilerHost = createCompilerHost(
                 programFiles.concat(otherFiles),
-                (fileName, code, writeByteOrderMark) => fileOutputs.push({ fileName, code, writeByteOrderMark }),
+                (fileName, code, writeByteOrderMark) => {
+                    // If emitting a wasm module, disassemble the binary.
+                    code = <string>(isWasm(fileName)
+                        ? ts.wasm.Disassembler.getText(<number[]>code, Harness.IO.newLine())
+                        : code);
+
+                    return fileOutputs.push({ fileName, code, writeByteOrderMark });
+                },
                 options.target,
                 useCaseSensitiveFileNames,
                 currentDirectory,
@@ -1688,16 +1696,15 @@ namespace Harness {
                 public currentDirectoryForProgram: string, private sourceMapData: ts.SourceMapData[], public traceResults: string[]) {
 
                 for (const emittedFile of fileResults) {
+                    assert.typeOf(emittedFile.code, "string",
+                        "CompilerHost.writeFile() callback must disassemble wasm modules.");
+
                     if (isDTS(emittedFile.fileName)) {
                         // .d.ts file, add to declFiles emit
                         this.declFilesCode.push(emittedFile);
                     }
-                    else if (isJS(emittedFile.fileName) || isJSX(emittedFile.fileName)) {
+                    else if (isJS(emittedFile.fileName) || isJSX(emittedFile.fileName) || isWasm(emittedFile.fileName)) {
                         // .js file, add to files
-                        this.files.push(emittedFile);
-                    }
-                    else if (isWasm(emittedFile.fileName)) {
-                        // .wasm module, add to files.
                         this.files.push(emittedFile);
                     }
                     else if (isJSMap(emittedFile.fileName)) {

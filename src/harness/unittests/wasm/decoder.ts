@@ -6,14 +6,18 @@ namespace ts.wasm {
      * Binary encoder for reading WebAssembly modules.
      */
     export class Decoder {
-        private offset = 0;
+        private _offset = 0;
 
         /** Construct a new Decoder instance to read the given buffer. */
         constructor(private buffer: number[]) {}
 
         /** Returns the number of unconsumed bytes remaining in the buffer. */
-        private get remaining() {
+        public get remaining() {
             return this.buffer.length - this.offset;
+        }
+
+        public get offset() {
+            return this._offset;
         }
 
         /** Helper for vetting that an argument with the given 'name' has a non-negative integer 'value'. */
@@ -45,7 +49,7 @@ namespace ts.wasm {
 
             const result = this.buffer[this.offset];            // Get the next available byte.
             assert_is_uint8(result);                            // Sanity check that it is a byte.
-            this.offset++;                                      // Advance to the next byte.
+            this._offset++;                                     // Advance to the next byte.
 
             return result;                                      // Return the result.
         }
@@ -59,7 +63,7 @@ namespace ts.wasm {
             const bytes = this.buffer.slice(this.offset, this.offset + count);
 
             Debug.assert(bytes.length === count);      // Paranoid check that we sliced off the expected number of bytes.
-            this.offset += count;
+            this._offset += count;
 
             return bytes;
         }
@@ -144,6 +148,18 @@ namespace ts.wasm {
             return result;
         }
 
+        // Instruction Opcodes
+
+        /** Reads an 'opcode', asserting it is a valid value in the enum. */
+        public op() {
+            // In the MVP, the opcodes of instructions are all encoded in a single byte since there are fewer than 256 opcodes.
+            // Future features like SIMD and atomics will bring the total count above 256 and so an extension scheme will be
+            // necessary, designating one or more single-byte values as prefixes for multi-byte opcodes.
+            const op = this.uint8();
+            assert_is_opcode(op);
+            return op;
+        }
+
         // Language Types
 
         /** Read a 'type' as a varint7, asserting it is a valid value in the enum. */
@@ -217,7 +233,7 @@ namespace ts.wasm {
         }
 
         /** Invoked by 'section()' to read the payload of the custom section (including the name).
-            The leading 'secton_code' and 'payload_len' have already been consumed at this point. */
+            The leading 'section_code' and 'payload_len' have already been consumed at this point. */
         private custom_section(payload_len: number) {
             const custom_start = this.offset;                   // Remember the offset before name fields, used to calculate
                                                                 // the combined sizeof(name) and sizeof(name_len) below.
@@ -234,7 +250,7 @@ namespace ts.wasm {
         }
 
         /** Invoked by 'section()' to read the 'payload_data' of the type section.  The leading
-            'secton_code' and 'payload_len' have already been consumed at this point. */
+            'section_code' and 'payload_len' have already been consumed at this point. */
         private type_section() {
             const types = new TypeSection();
 
@@ -259,7 +275,7 @@ namespace ts.wasm {
         }
 
         /** Invoked by 'section()' to read the 'payload_data' of the function section.  The leading
-            'secton_code' and 'payload_len' have already been consumed at this point. */
+            'section_code' and 'payload_len' have already been consumed at this point. */
         private function_section() {
             const count = this.varint32();                          // varuint32    count of signature indices to follow
             const types = this.sequenceOf(count, this.varuint32);   // varuint32*   sequence of indices into the type section
@@ -269,7 +285,7 @@ namespace ts.wasm {
             return result;
         }
         /** Invoked by 'section()' to read the 'payload_data' of the export section.  The leading
-            'secton_code' and 'payload_len' have already been consumed at this point. */
+            'section_code' and 'payload_len' have already been consumed at this point. */
         private export_section() {
             const count = this.varint32();                              // varuint32        count of export entries to follow
             const entries = this.sequenceOf(count, this.export_entry);  // export_entry*    repeated export entries
@@ -289,7 +305,7 @@ namespace ts.wasm {
         }
 
         /** Invoked by 'section()' to read the 'payload_data' of the code section.  The leading
-            'secton_code' and 'payload_len' have already been consumed at this point. */
+            'section_code' and 'payload_len' have already been consumed at this point. */
         public code_section() {
             const code = new CodeSection();
 
