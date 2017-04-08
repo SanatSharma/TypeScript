@@ -10,8 +10,11 @@ namespace ts {
     const brackets = createBracketsMap();
 
     /*@internal*/
-    // targetSourceFile is when users only want one file in entire project to be emitted. This is used in compileOnSave feature
-    export function emitFiles(resolver: EmitResolver, host: EmitHost, targetSourceFile: SourceFile, emitOnlyDtsFiles?: boolean, transformers?: TransformerFactory<SourceFile>[]): EmitResult {
+    // 'typeCheckerForWasm' is used when emitting wasm, which requires semantic information.  The transformation pipeline and
+    //  script emission use the scoped 'emitResolver'.
+    //
+    // 'targetSourceFile' is when users only want one file in entire project to be emitted. This is used in compileOnSave feature
+    export function emitFiles(typeCheckerForWasm: TypeChecker, resolver: EmitResolver, host: EmitHost, targetSourceFile: SourceFile, emitOnlyDtsFiles?: boolean, transformers?: TransformerFactory<SourceFile>[]): EmitResult {
         const compilerOptions = host.getCompilerOptions();
         const moduleKind = getEmitModuleKind(compilerOptions);
         const sourceMapDataList: SourceMapData[] = compilerOptions.sourceMap || compilerOptions.inlineSourceMap ? [] : undefined;
@@ -56,11 +59,7 @@ namespace ts {
             forEachEmittedFile(host, emitSourceFileOrBundle, transform.transformed, emitOnlyDtsFiles);
         }
         else {
-            // TODO: This currently just writes the minimum 8B module consisting of the magic number
-            //       followed by the version.
-            const encoder = new ts.wasm.Encoder();
-            encoder.module_preamble(new ts.wasm.Preamble(/* version: */ WasmVersion.Mvp));
-            host.writeFile(compilerOptions.outFile, encoder.buffer, false);
+            ts.wasm.emit(typeCheckerForWasm, host, emitterDiagnostics, sourceFiles, compilerOptions.outFile);
         }
         performance.measure("printTime", "beforePrint");
 

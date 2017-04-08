@@ -795,6 +795,8 @@ namespace ts {
                 }
             }
 
+            const typeChecker = getDiagnosticsProducingTypeChecker();
+
             // Create the emit resolver outside of the "emitTime" tracking code below.  That way
             // any cost associated with it (like type checking) are appropriate associated with
             // the type-checking counter.
@@ -803,12 +805,17 @@ namespace ts {
             // This is because in the -out scenario all files need to be emitted, and therefore all
             // files need to be type checked. And the way to specify that all files need to be type
             // checked is to not pass the file to getEmitResolver.
-            const emitResolver = getDiagnosticsProducingTypeChecker().getEmitResolver((options.outFile || options.out) ? undefined : sourceFile);
+            const emitResolver = typeChecker.getEmitResolver((options.outFile || options.out) ? undefined : sourceFile);
 
             performance.mark("beforeEmit");
 
             const transformers = emitOnlyDtsFiles ? [] : getTransformers(options, customTransformers);
+
+            // Note: We pass both the full 'typeChecker' and the scoped 'emitResolver'.  The 'typeChecker'
+            //       is used when emitting wasm, which requires semantic information.  The 'emitResolver'
+            //       is used by the transformation pipeline and script emission.
             const emitResult = emitFiles(
+                typeChecker,
                 emitResolver,
                 getEmitHost(writeFileCallback),
                 sourceFile,
@@ -1694,12 +1701,23 @@ namespace ts {
 
             // Cannot specify module gen that isn't amd or system with --out
             if (outFile) {
-                if (options.module && !(options.module === ModuleKind.AMD || options.module === ModuleKind.System)) {
-                    programDiagnostics.add(createCompilerDiagnostic(Diagnostics.Only_amd_and_system_modules_are_supported_alongside_0, options.out ? "out" : "outFile"));
-                }
-                else if (options.module === undefined && firstNonAmbientExternalModuleSourceFile) {
-                    const span = getErrorSpanForNode(firstNonAmbientExternalModuleSourceFile, firstNonAmbientExternalModuleSourceFile.externalModuleIndicator);
-                    programDiagnostics.add(createFileDiagnostic(firstNonAmbientExternalModuleSourceFile, span.start, span.length, Diagnostics.Cannot_compile_modules_using_option_0_unless_the_module_flag_is_amd_or_system, options.out ? "out" : "outFile"));
+                const moduleKind = getEmitModuleKind(options);
+                switch (moduleKind) {
+                    case ModuleKind.AMD:
+                    case ModuleKind.System:
+                    case ModuleKind.Wasm:
+                        // AMD, System, and Wasm are always permitted to use --outFile/--out.
+                        break;
+                    default:
+                        if (options.module !== undefined) {
+                            // An incompatible module kind was explicitly requested.  Produce an appropriate error.
+                            programDiagnostics.add(createCompilerDiagnostic(Diagnostics.Only_amd_and_system_modules_are_supported_alongside_0, options.out ? "out" : "outFile"));
+                        } else if (firstNonAmbientExternalModuleSourceFile) {
+                            // If the module kind is being implicitly inferred, '--outFile/--out' are supported as long
+                            // as no non-ambient external modules are included.
+                            const span = getErrorSpanForNode(firstNonAmbientExternalModuleSourceFile, firstNonAmbientExternalModuleSourceFile.externalModuleIndicator);
+                            programDiagnostics.add(createFileDiagnostic(firstNonAmbientExternalModuleSourceFile, span.start, span.length, Diagnostics.Cannot_compile_modules_using_option_0_unless_the_module_flag_is_amd_or_system, options.out ? "out" : "outFile"));
+                        }
                 }
             }
 
