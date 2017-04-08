@@ -3439,8 +3439,13 @@ namespace ts {
         External = 5
     }
 
+    /** Supported wasm versions.  Using this enum in the declaration of ScriptTarget makes the encoding clearer. */
+    export const enum WasmVersion {
+        Mvp = 0x01
+    }
+
     export const enum ScriptTarget {
-        // Use positive indices for script targets.
+        // For script targets, use positive indices.
         ES3 = 0,
         ES5 = 1,
         ES2015 = 2,
@@ -3449,8 +3454,8 @@ namespace ts {
         ESNext = 5,
         Latest = ESNext,
 
-        // Use negative indices for wasm corresponding to the targeted module version.
-        Wasm = -0x0d,           // Latest supported version (0x0d).
+        // For wasm, use negative indices corresponding to the targeted module version.
+        Wasm = -(WasmVersion.Mvp),      // Latest supported version (0x01).
     }
 
     export enum ModuleKind {

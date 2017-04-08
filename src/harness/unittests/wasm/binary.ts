@@ -310,7 +310,7 @@ namespace ts.wasm {
             describe("module structure", () => {
                 describe("preamble", () => {
                     const magic_number = [ 0x00, 0x61, 0x73, 0x6d];         // First 4 bytes of a module must begin with '\0asm' (little endian).
-                    const version = 0x0d;                                   // Current version number, will reset to 1 for MVP.
+                    const version = WasmVersion.Mvp;                        // Current version number.
 
                     it("constructor must require a supported version number", () => {
                         const preamble = new Preamble(version);             // A valid version number must be accepted.

@@ -197,7 +197,7 @@ namespace ts.wasm {
 
         constructor (readonly version: number) {
             switch (this.version) {
-                case 0x0d:      // Currently 0xd. The version for MVP will be reset to 1.
+                case WasmVersion.Mvp:
                     break;
                 default:
                     Debug.fail(`Unsupported WebAssembly version in module preamble: '0x${hex32(version)}'`);

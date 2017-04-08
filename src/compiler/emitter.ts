@@ -59,7 +59,7 @@ namespace ts {
             // TODO: This currently just writes the minimum 8B module consisting of the magic number
             //       followed by the version.
             const encoder = new ts.wasm.Encoder();
-            encoder.module_preamble(new ts.wasm.Preamble(/* version: */ 0x0d));
+            encoder.module_preamble(new ts.wasm.Preamble(/* version: */ WasmVersion.Mvp));
             host.writeFile(compilerOptions.outFile, encoder.buffer, false);
         }
         performance.measure("printTime", "beforePrint");
