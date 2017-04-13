@@ -144,9 +144,9 @@ namespace ts.wasm {
             this.section(custom, encoder => {
                 // Note: At this point we know we are encoding a custom section (i.e., id = 0), so
                 //       the following two fields are not optional.
-                encoder.varuint32(custom.name.length);                  // varuint32?   length of the section name in bytes, present if id == 0
-                encoder.bytes(custom.name);                             // bytes?       section name string, present if id == 0
-                encoder.bytes(custom.payload_data);                     // bytes        content of this section, of length
+                encoder.utf8(custom.name);              // varuint32?   length of the section name in bytes, present if id == 0
+                                                        // bytes?       section name string, present if id == 0
+                encoder.bytes(custom.payload_data);     // bytes        content of this section, of length
             });
         }
 

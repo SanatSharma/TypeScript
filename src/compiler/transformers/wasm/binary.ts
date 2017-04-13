@@ -245,7 +245,7 @@ namespace ts.wasm {
         Custom sections all have the same id, and can be named non-uniquely (all bytes composing
         their names can be identical). */
     export class CustomSection extends Section {
-        constructor (readonly name: number[], readonly payload_data: number[]) {
+        constructor (readonly name: string, readonly payload_data: number[]) {
             super(section_code.Custom);
         }
     }

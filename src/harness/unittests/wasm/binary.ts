@@ -352,13 +352,14 @@ namespace ts.wasm {
 
                 describe("custom section", () => {
                     it("must permit a zero-length name and payload", () => {
-                        check_section("custom_section", new CustomSection([], []));
+                        check_section("custom_section", new CustomSection("", []));
                     });
 
                     it("must round-trip name and payload", () => {
-                        check_section("custom_section", new CustomSection(
-                            [0x6e, 0x61, 0x6d, 0x65],                       // "name"
-                            [0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64]));   // "payload"
+                        check_section("custom_section",
+                            new CustomSection(
+                                "name",
+                                [0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64]));   // "payload"
                     });
                 });
 

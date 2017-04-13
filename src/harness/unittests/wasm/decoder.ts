@@ -235,13 +235,13 @@ namespace ts.wasm {
         /** Invoked by 'section()' to read the payload of the custom section (including the name).
             The leading 'section_code' and 'payload_len' have already been consumed at this point. */
         private custom_section(payload_len: number) {
-            const custom_start = this.offset;                   // Remember the offset before name fields, used to calculate
+            const custom_start = this.offset;                   // Remember the offset before name fields.  Used to calculate
                                                                 // the combined sizeof(name) and sizeof(name_len) below.
 
             // Note: At this point we know we are decoding a custom section (i.e., id = 0), so
             //       the following two fields are not optional.
-            const name_len = this.varuint32();                  // varuint32?   length of the section name in bytes, present if id == 0
-            const name = this.bytes(name_len);                  // bytes?       section name string, present if id == 0
+            const name = this.utf8();                           // varuint32?   length of the section name in bytes, present if id == 0
+                                                                // bytes?       section name string, present if id == 0
 
             const payload_data = this.bytes(                    // bytes        content of this section, of length
                 payload_len - (this.offset - custom_start));    //              payload_len - sizeof(name) - sizeof(name_len)
