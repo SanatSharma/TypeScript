@@ -129,52 +129,78 @@ namespace ts.wasm {
          * Helper that invokes 'getPayload' with a nested 'payloadEncoder' to get the section's payload_data'.
          * It then writes the given 'id', 'payload_len', and 'payload_data'.  Can be used for custom sections
          * by including the 'name_len' and 'name' in the 'payload_data'.
+         *
+         * 'elideIfEmpty' determines whether empty sections are encoded, or are elided from the wasm module.
+         * (Generally, you want to elide them.  The option to include empty sections is currently only supported
+         * so we can test that the decoder successfully decodes empty sections, as empty sections are permitted
+         * by the spec.)
          */
-        private section<T extends Section>(section: T, getPayload: (payloadEncoder: Encoder) => void) {
+        private section<T extends Section>(section: T, getPayload: (payloadEncoder: Encoder) => boolean, elideIfEmpty: boolean) {
             const payload = new Encoder();
-            getPayload(payload);
+            const hasEntries = getPayload(payload);
+            if (!hasEntries && elideIfEmpty) {
+                return false;
+            }
 
             this.section_code(section.id);              // varuint7     section code
             this.varuint32(payload.buffer.length);      // varuint32    size of this section in bytes
             this.bytes(payload.buffer);                 // (name_len, name, and payload_data)
+            return hasEntries;
         }
 
         /** Write the given custom section.  */
-        public custom_section(custom: CustomSection) {
-            this.section(custom, encoder => {
+        public custom_section(custom: CustomSection, elideIfEmpty: boolean) {
+            return this.section(custom, encoder => {
                 // Note: At this point we know we are encoding a custom section (i.e., id = 0), so
                 //       the following two fields are not optional.
                 encoder.utf8(custom.name);              // varuint32?   length of the section name in bytes, present if id == 0
                                                         // bytes?       section name string, present if id == 0
                 encoder.bytes(custom.payload_data);     // bytes        content of this section, of length
-            });
+
+                // We assume that the existence of a custom section potentially has meaning, even if the
+                // name/bytes are empty.  Therefore we return 'true' to indicate that this section should
+                // always be emitted.
+                return true;
+            }, elideIfEmpty);
+        }
+
+        /** Validates that the 'encoder' length matches the expected value when 'hasEntries' indicates the section was empty. */
+        private checkSectionHasEntries(hasEntries: boolean, encoder: Encoder, expectedEmptyLength: number) {
+            Debug.assert(hasEntries !== (encoder.buffer.length === expectedEmptyLength),
+                'Encoded payload of empty section must match expected length',
+                () => `Expected ${expectedEmptyLength}, but got ${encoder.buffer.length}`);
+            return hasEntries;
         }
 
         /** Write the given type section. */
-        public type_section(types: TypeSection) {
-            this.section(types, encoder => {
-                encoder.varuint32(types.entries.length);                // varuint32    count of type entries to follow
-                types.entries.forEach(                                  // func_type*   repeated type entries
+        public type_section(section: TypeSection, elideIfEmpty: boolean) {
+            return this.section(section, encoder => {
+                encoder.varuint32(section.entries.length);              // varuint32    count of type entries to follow
+                section.entries.forEach(                                // func_type*   repeated type entries
                     signature => encoder.func_type(signature));
-            });
+                return this.checkSectionHasEntries(section.entries.length > 0, encoder, /* expectedEmptyLength: */ 1);
+            }, elideIfEmpty);
         }
+
         /** Write the given function section. */
-        public function_section(section: FunctionSection) {
-            this.section(section, encoder => {
+        public function_section(section: FunctionSection, elideIfEmpty: boolean) {
+            return this.section(section, encoder => {
                 encoder.varuint32(section.types.length);                // varuint32    count of signature indices to follow
                 section.types.forEach(type => {                         // varuint32*   sequence of indices into the type section
                     encoder.varuint32(type);
                 });
-            });
+                return this.checkSectionHasEntries(section.types.length > 0, encoder, /* expectedEmptyLength: */ 1);
+            }, elideIfEmpty);
         }
 
         /** Write the given 'export section'. */
-        public export_section(section: ExportSection) {
-            this.section(section, encoder => {
+        public export_section(section: ExportSection, elideIfEmpty: boolean) {
+            return this.section(section, encoder => {
                 encoder.varint32(section.entries.length);               // varuint32        count of export entries to follow
                 section.entries.forEach(                                // export_entry*    repeated export entries
                     item => encoder.export_entry(item));
-            });
+                return this.checkSectionHasEntries(section.entries.length > 0, encoder, /* expectedEmptyLength: */ 1);
+            }, elideIfEmpty);
         }
 
         /** Invoked by 'export_section()' to write the given 'export_entry'. */
@@ -186,11 +212,12 @@ namespace ts.wasm {
         }
 
         /** Write the given 'code section'. */
-        public code_section(section: CodeSection) {
-            this.section(section, encoder => {
+        public code_section(section: CodeSection, elideIfEmpty: boolean) {
+            return this.section(section, encoder => {
                 encoder.varuint32(section.bodies.length);                       // varuint32        count of function bodies to follow
                 section.bodies.forEach(body => encoder.function_body(body));    // function_body*   sequence of Function Bodies
-            });
+                return this.checkSectionHasEntries(section.bodies.length > 0, encoder, /* expectedEmptyLength: */ 1);
+            }, elideIfEmpty);
         }
 
         // Function Bodies
@@ -219,6 +246,5 @@ namespace ts.wasm {
             this.varuint32(entry.count);    // varuint32    number of local variables of the following type
             this.value_type(entry.type);    // value_type   type of the variables
         }
-
     }
 }

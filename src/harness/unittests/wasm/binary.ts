@@ -195,13 +195,21 @@ namespace ts.wasm {
             /** Ensures that the given 'original' instance of a Section round-trips through encoding/decoding
                 functions with the given 'name'.  Succeeds if the decoded copy is deeply equal to the original.
                 The decoded copy is returned for further verification. */
-            function check_section<T extends Section>(name: string, original: T) {
+            function check_section<T extends Section>(name: string, original: T, isEmpty: boolean) {
                 const encoder = new Encoder();
 
-                // Lookup the encode functions we want to test by 'name'.
-                const encode: (section: T) => void = ((<any>encoder)[name]).bind(encoder);
+                // Lookup the encode function we want to test by 'name'.
+                const encode: (section: T, elideIfEmpty: boolean) => boolean = ((<any>encoder)[name]).bind(encoder);
 
-                encode(original);
+                if (isEmpty) {
+                    assert.isFalse(encode(original, /* elideIfEmpty: */ true));
+                    assert.equal(encoder.buffer.length, 0,
+                        "Encoder must emit 0 bytes for an empty section when 'elideIfEmpty' is true.");
+                }
+
+                const hasEntries = encode(original, /* elideIfEmpty: */ false);
+                assert.notEqual(hasEntries, isEmpty,
+                    "Value returned from section encode function must be true if section had entries, false if section was empty.");
 
                 const decoder = new Decoder(encoder.buffer);
                 const replica = decoder.section();
@@ -352,14 +360,15 @@ namespace ts.wasm {
 
                 describe("custom section", () => {
                     it("must permit a zero-length name and payload", () => {
-                        check_section("custom_section", new CustomSection("", []));
+                        check_section("custom_section", new CustomSection("", []), /* isEmpty: */ false);
                     });
 
                     it("must round-trip name and payload", () => {
                         check_section("custom_section",
                             new CustomSection(
                                 "name",
-                                [0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64]));   // "payload"
+                                [0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64]),    // "payload"
+                            /* isEmpty: */ false);
                     });
                 });
 
@@ -376,7 +385,7 @@ namespace ts.wasm {
 
                     // It would be better to omit the section, but to my knowledge nothing precludes an empty type section.
                     it(`must round-trip an empty type section`, () => {
-                        check_section("type_section", new TypeSection());
+                        check_section("type_section", new TypeSection(), /* isEmpty: */ true);
                     });
 
                     // Ensure that each of the 'func_type' signatures above round-trip individually.
@@ -384,7 +393,7 @@ namespace ts.wasm {
                         it(`must round-trip ${signature.param_types.length} params/${signature.return_types.length} return values`, () => {
                             const types = new TypeSection();
                             types.add(signature);
-                            check_section("type_section", types);
+                            check_section("type_section", types, /* isEmpty: */ false);
                         });
                     });
 
@@ -394,7 +403,7 @@ namespace ts.wasm {
                         signatures.forEach(signature => {
                             types.add(signature);
                         });
-                        check_section("type_section", types);
+                        check_section("type_section", types, /* isEmpty: */ false);
                     });
                 });
 
@@ -404,7 +413,7 @@ namespace ts.wasm {
                         it(`must round-trip section with ${indices.length} type indices`, () => {
                             const functions = new FunctionSection();
                             indices.forEach(index => functions.add(index));
-                            check_section("function_section", functions);
+                            check_section("function_section", functions, /* isEmpty: */ indices.length === 0);
                         });
                     });
                 });
@@ -439,7 +448,7 @@ namespace ts.wasm {
                     describe("export section", () => {
                         // It would be better to omit the section, but to my knowledge nothing precludes an empty section.
                         it(`must round-trip with zero entries`, () => {
-                            check_section("export_section", new ExportSection());
+                            check_section("export_section", new ExportSection(), /* isEmpty: */ true);
                         });
 
                         // Ensure that export_section round-trips with each case individually.
@@ -447,7 +456,7 @@ namespace ts.wasm {
                             it(`must round-trip ${testCase.description}`, () => {
                                 const section = new ExportSection();
                                 section.add(new ExportEntry(testCase.name, testCase.kind, testCase.index));
-                                check_section("export_section", section);
+                                check_section("export_section", section, /* isEmpty: */ false);
                             });
                         });
 
@@ -457,7 +466,7 @@ namespace ts.wasm {
                             validCases.forEach(testCase => {
                                 section.add(new ExportEntry(testCase.name, testCase.kind, testCase.index));
                             });
-                            check_section("export_section", section);
+                            check_section("export_section", section, /* isEmpty: */ false);
                         });
                     });
                 }
@@ -511,7 +520,7 @@ namespace ts.wasm {
                     describe("code section", () => {
                         // It would be better to omit the section, but to my knowledge nothing precludes an empty section.
                         it(`must round-trip with zero entries`, () => {
-                            check_section("code_section", new CodeSection());
+                            check_section("code_section", new CodeSection(), /* isEmpty: */ true);
                         });
 
                         // Ensure that code_section round-trips with each of the function bodies above.
@@ -519,7 +528,7 @@ namespace ts.wasm {
                             it(`must round-trip ${body.description}`, () => {
                                 const section = new CodeSection();
                                 section.add(new FunctionBody(body.locals, body.code));
-                                check_section("code_section", section);
+                                check_section("code_section", section, /* isEmpty: */ false);
                             });
                         });
 
@@ -529,7 +538,7 @@ namespace ts.wasm {
                             validBodies.forEach(body => {
                                 section.add(new FunctionBody(body.locals, body.code));
                             });
-                            check_section("code_section", section);
+                            check_section("code_section", section, /* isEmpty: */ false);
                         });
                     });
                 }
