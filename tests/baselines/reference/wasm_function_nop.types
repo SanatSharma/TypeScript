@@ -1,0 +1,5 @@
+=== tests/cases/compiler/wasm_function_nop.ts ===
+
+function nop() { }
+>nop : () => void
+

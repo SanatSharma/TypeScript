@@ -439,7 +439,7 @@ namespace ts.wasm {
         /** Called by 'section()' to print the payload of a FunctionSection. */
         private function_section(functions: FunctionSection) {
             functions.types.forEach((type, index) => {
-                this.writeLine(`[${index}] ${type}`);
+                this.writeLine(`[${index}] type index: ${type}`);
             });
         }
 

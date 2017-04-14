@@ -90,6 +90,18 @@ namespace ts.wasm {
             this.bytes(encoder.buffer);                 // bytes           utf8 encoded string.
         }
 
+        // Instruction Opcodes
+
+        /** Write an 'opcode', asserting it is a valid value in the enum. */
+        public op(op: opcode) {
+            assert_is_opcode(op);
+
+            // In the MVP, the opcodes of instructions are all encoded in a single byte since there are fewer than 256 opcodes.
+            // Future features like SIMD and atomics will bring the total count above 256 and so an extension scheme will be
+            // necessary, designating one or more single-byte values as prefixes for multi-byte opcodes.
+            this.uint8(op);
+        }
+
         // Language Types
 
         /** Write a 'type' as a varint7, asserting it is a valid value in the enum. */
