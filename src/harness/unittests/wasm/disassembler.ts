@@ -452,7 +452,7 @@ namespace ts.wasm {
 
         /** Returns the string representing the given 'entry'. */
         private export_entry(entry: ExportEntry) {
-            return `${this.external_kind(entry.kind)} '${entry.name}' -> ${entry.index} -> ${this.functions.types[entry.index]}`;
+            return `'${entry.name}' ${this.external_kind(entry.kind)} index: ${entry.index}`;
         }
 
         /** Called by 'section()' to print the payload of a CodeSection. */
@@ -467,12 +467,21 @@ namespace ts.wasm {
 
         /** Called by 'code_section()' to print each function_body. */
         private function_body(index: number, body: FunctionBody) {
-            // If the function is exported, print the export kind and name.
-            const exports = this.exports.entries.filter(entry => entry.index === index);
-            if (exports.length > 0) {
-                const exportEntry = exports[0];
+            // Note: Per spec, the exports section may be elided if there are no exports from the module.
+            //       However, if exports exist, the exports section must precede the code section.
+            const exports = this.exports !== undefined
+                ? this.exports.entries.filter(entry => entry.index === index)
+                : [];
+
+            // Print all exports for this function (if any).
+            exports.forEach((exportEntry, index) => {
+                // If more than one export, separate with new lines.
+                if (index > 0) {
+                    this.writeLine("...");
+                }
+
                 this.write(`export ${this.external_kind(exportEntry.kind)} '${exportEntry.name}': `);
-            }
+            });
 
             // Get the function's signature from the type section and print it.
             const type = this.types.entries[this.functions.types[index]];
@@ -480,14 +489,20 @@ namespace ts.wasm {
             this.indent();
 
             // Print the function's locals.
-            this.writeLine("locals:")
-            this.indent();
             let localIndex = 0;
+
+            this.writeLine("params:")
+            this.indent();
 
             // Each parameter is an implicit local, beginning at index zero.
             type.param_types.forEach(param => {
-                this.writeLine(`\$${localIndex++}: ${this.value_type(param)} (param)`);
+                this.writeLine(`\$${localIndex++}: ${this.value_type(param)}`);
             });
+
+            this.unindent();
+
+            this.writeLine("locals:")
+            this.indent();
 
             // Body locals begin at the index following the last parameter.
             body.locals.forEach(local => {
@@ -496,8 +511,9 @@ namespace ts.wasm {
                 }
             });
 
-            // Disassemble the body's byte code.
             this.unindent();
+
+            // Disassemble the body's byte code.
             this.writeLine("code:")
             this.indent();
             this.code(body.code);
