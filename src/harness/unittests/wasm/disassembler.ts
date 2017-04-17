@@ -233,23 +233,25 @@ namespace ts.wasm {
         public static getText(module: number[], newLine: string) {
             const self = new Disassembler(module, newLine);
             self.bytes(self.module, 0, self.module.length);
-            self.writer.writeLine();
+            self.newLine();
 
             self.module_preamble();
-            self.writer.increaseIndent();
+            self.indent();
             self.decoded();
-            self.writer.decreaseIndent();
+            self.unindent();
+            self.newLine();
 
             while(self.section());
             return self.writer.getText();
         }
 
-        /** Write the given string without a newline. */
+        /** Print the given string without a newline. */
         private write(s: string) {
             this.writer.write(s);
         }
 
-        /** Write the given string (if any), followed by a newline. */
+        /** Print the given string (if any), followed by a newline if not already at the start of a new line.
+            (i.e., this elides blank lines.  Use 'newLine()' to force a blank line.) */
         private writeLine(s?: string) {
             if (s !== undefined) {
                 this.writer.write(s);
@@ -265,6 +267,14 @@ namespace ts.wasm {
         /** Decrease the current indentation level. */
         private unindent() {
             this.writer.decreaseIndent();
+        }
+
+        /** Prints a new line, regardless if already at the beginning of a new line. */
+        private newLine() {
+            // Calling 'rawWrite' sets EmitTextWriter's 'lineStart' flag to false, preventing
+            // 'writeLine()' from eliding blank lines.
+            this.writer.rawWrite("");
+            this.writer.writeLine();
         }
 
         /** Writes spaces, stopping at the designated column.  Used for aligning comments at a given stop, etc. */
@@ -416,6 +426,8 @@ namespace ts.wasm {
                     Debug.fail(`Not Implemented: Unsupported section id '${section.id}'.`);
             }
 
+            this.newLine();
+
             // Return 'true' if unprocessed bytes remain.
             return this.decoder.remaining !== 0;
         }
@@ -541,7 +553,7 @@ namespace ts.wasm {
                     }).join(" ");                               // Join immediates with a space.
 
                 this.write(` ${immediates}`);                   // Write the immediates (if any).
-                this.writePadding(30);                          // Pad to column 30.
+                this.writePadding(45);                          // Pad to column 45.
                 this.writeLine(`// ${opInfo.comment}`);         // Print the comment describing the opcode.
             }
         }
