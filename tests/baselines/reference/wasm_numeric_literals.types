@@ -4,3 +4,8 @@ export function pi() { return 3.141592653589793; }
 >pi : () => number
 >3.141592653589793 : 3.141592653589793
 
+export function minimumExactInteger() { return -9007199254740992; }
+>minimumExactInteger : () => number
+>-9007199254740992 : -9007199254740992
+>9007199254740992 : 9007199254740992
+

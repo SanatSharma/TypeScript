@@ -59,7 +59,7 @@ namespace ts {
             forEachEmittedFile(host, emitSourceFileOrBundle, transform.transformed, emitOnlyDtsFiles);
         }
         else {
-            ts.wasm.emit(typeCheckerForWasm, host, emitterDiagnostics, sourceFiles, compilerOptions.outFile);
+            ts.wasm.emit(typeCheckerForWasm, host, emitterDiagnostics, transform.transformed, compilerOptions.outFile);
         }
         performance.measure("printTime", "beforePrint");
 

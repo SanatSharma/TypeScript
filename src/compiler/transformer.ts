@@ -10,6 +10,7 @@
 /// <reference path="transformers/module/module.ts" />
 /// <reference path="transformers/module/system.ts" />
 /// <reference path="transformers/module/es2015.ts" />
+/// <reference path="transformers/wasm/transformer.ts" />
 
 /* @internal */
 namespace ts {
@@ -37,42 +38,51 @@ namespace ts {
     }
 
     export function getTransformers(compilerOptions: CompilerOptions, customTransformers?: CustomTransformers) {
-        const jsx = compilerOptions.jsx;
         const languageVersion = getEmitScriptTarget(compilerOptions);
-        const moduleKind = getEmitModuleKind(compilerOptions);
         const transformers: TransformerFactory<SourceFile>[] = [];
 
         addRange(transformers, customTransformers && customTransformers.before);
 
-        transformers.push(transformTypeScript);
-
-        if (jsx === JsxEmit.React) {
-            transformers.push(transformJsx);
+        if (languageVersion === ScriptTarget.Wasm) {
+            // If targeting wasm, run the special wasm transformer to rewrite AST patterns that are awkward
+            // to directly emit byte code for.
+            transformers.push(ts.transformWasm);
         }
+        else {
+            // Otherwise, build the chain of script transforms according to the compiler options.
+            const jsx = compilerOptions.jsx;
+            const moduleKind = getEmitModuleKind(compilerOptions);
 
-        if (languageVersion < ScriptTarget.ESNext) {
-            transformers.push(transformESNext);
-        }
+            transformers.push(transformTypeScript);
 
-        if (languageVersion < ScriptTarget.ES2017) {
-            transformers.push(transformES2017);
-        }
+            if (jsx === JsxEmit.React) {
+                transformers.push(transformJsx);
+            }
 
-        if (languageVersion < ScriptTarget.ES2016) {
-            transformers.push(transformES2016);
-        }
+            if (languageVersion < ScriptTarget.ESNext) {
+                transformers.push(transformESNext);
+            }
 
-        if (languageVersion < ScriptTarget.ES2015) {
-            transformers.push(transformES2015);
-            transformers.push(transformGenerators);
-        }
+            if (languageVersion < ScriptTarget.ES2017) {
+                transformers.push(transformES2017);
+            }
 
-        transformers.push(getModuleTransformer(moduleKind));
+            if (languageVersion < ScriptTarget.ES2016) {
+                transformers.push(transformES2016);
+            }
 
-        // The ES5 transformer is last so that it can substitute expressions like `exports.default`
-        // for ES3.
-        if (languageVersion < ScriptTarget.ES5) {
-            transformers.push(transformES5);
+            if (languageVersion < ScriptTarget.ES2015) {
+                transformers.push(transformES2015);
+                transformers.push(transformGenerators);
+            }
+
+            transformers.push(getModuleTransformer(moduleKind));
+
+            // The ES5 transformer is last so that it can substitute expressions like `exports.default`
+            // for ES3.
+            if (languageVersion < ScriptTarget.ES5) {
+                transformers.push(transformES5);
+            }
         }
 
         addRange(transformers, customTransformers && customTransformers.after);

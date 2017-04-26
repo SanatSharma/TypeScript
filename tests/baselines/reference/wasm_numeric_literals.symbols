@@ -3,3 +3,6 @@
 export function pi() { return 3.141592653589793; }
 >pi : Symbol(pi, Decl(wasm_numeric_literals.ts, 0, 0))
 
+export function minimumExactInteger() { return -9007199254740992; }
+>minimumExactInteger : Symbol(minimumExactInteger, Decl(wasm_numeric_literals.ts, 1, 50))
+
