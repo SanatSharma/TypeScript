@@ -1,0 +1,6 @@
+=== tests/cases/compiler/wasm_numeric_literals.ts ===
+
+export function pi() { return 3.141592653589793; }
+>pi : () => number
+>3.141592653589793 : 3.141592653589793
+

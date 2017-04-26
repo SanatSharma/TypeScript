@@ -3,6 +3,19 @@
 
 /* @internal */
 namespace ts.wasm {
+    /** Temporary helper to invoke Debug.fail() for an unexpected TypeScript node.  Once the compiler is
+        sufficiently complete, this should be replaced with helpful messages logged to the DiagnosticCollection
+        to notify users when the use unsupported language features.
+
+        https://github.com/DLehenbauer/TypeScript/issues/4
+     */
+    function unexpectedNode(node: Node) {
+        // Use of 'eval(..)' in the below template literal circumvents TypeScript's requirement that const
+        // enums are only indexed by const literals.  This is poor practice, but useful for this temporary
+        // helper.
+        Debug.fail(`Unexpected node '${getTextOfNode(node)}' in ${arguments.callee.caller}.  (kind='${eval(`ts.SyntaxKind[${node.kind}]`)}')`);
+    }
+
     function toValueType(type: Type) {
         if (type.flags & TypeFlags.Intrinsic) {
             const intrinsicType = <IntrinsicType>type;
@@ -12,11 +25,12 @@ namespace ts.wasm {
                 case "boolean":
                     return value_type.i32;
                 default:
-                    Debug.fail("Unhandled intrinsic type.");
+                    Debug.fail(`Unexpected intrinsic type '${intrinsicType.intrinsicName}'.`);
+                    break;
             }
         }
 
-        Debug.fail("Unhandled type.");
+        Debug.fail(`Unexpected type '${type.symbol.name}'.`);
     }
 
     /** Root wasm emit node representing the wasm module. */
@@ -35,6 +49,8 @@ namespace ts.wasm {
             this.diagnostics.add(createFileDiagnostic(sourceFile, span.start, span.length, message, ...args));
         }
 
+        /** Creates a 'WasmFunction' instance and adds its declaration with the given 'name', 'parameters'
+            and 'returns' type(s).  If 'isExported' is true, adds the function to the module exports table. */
         public function(
             name: string,
             parameters: { symbol: Symbol, type: value_type }[],
@@ -160,31 +176,27 @@ namespace ts.wasm {
 
     /** Builder for a wasm code block. */
     export class WasmBlock {
-        private code: Encoder = new Encoder();
+        private _code: OpEncoder = new OpEncoder();
 
         constructor(private module: WasmModule, private locals: WasmScope) {}
 
         private get resolver() { return this.module.resolver; }
 
-        private op(opcode: opcode) {
-            Debug.assert(this.code !== undefined,
-                "A 'WasmBlock' must not be modified after emission.");
-            this.code.op(opcode);
-        }
+        public get code() { return this._code; }
 
         public emit(section: CodeSection) {
             Debug.assert(this.code !== undefined,
                 "A 'WasmBlock' must only be emitted once.");
 
             // Wasm blocks (including function bodies) are terminated by the 'end' opcode.
-            this.op(opcode.end);
+            this.code.end();
 
             section.add(
                 new FunctionBody(
                     this.locals.asLocals(),
                     this.code.buffer));
 
-            this.code = undefined;
+            this._code = undefined;
         }
     }
 
@@ -212,7 +224,8 @@ namespace ts.wasm {
                     break;
                 }
                 default:
-                    Debug.fail(`Unimplemented: Unsupported statement '${getTextOfNode(tsStatement)}'.`);
+                    unexpectedNode(tsStatement);
+                    break;
             }
         });
     }
@@ -239,17 +252,45 @@ namespace ts.wasm {
                 : [ toValueType(returnType) ],
             isExported);
 
-        visitBlock(/* wasmFunc.body, */ tsFunc.body);
+        visitBlock(wasmFunc.body, tsFunc.body);
 
         return wasmFunc;
     }
 
-    function visitBlock(/* wasmBody: WasmBlock, */ tsBlock: Block) {
+    function visitBlock(wasmBlock: WasmBlock, tsBlock: Block) {
         for (const tsStatement of tsBlock.statements) {
             switch (tsStatement.kind) {
+                case SyntaxKind.ReturnStatement:
+                    const tsReturnStmt = <ReturnStatement>tsStatement;
+
+                    const tsReturnExpr = tsReturnStmt.expression;
+                    if (tsReturnExpr) {
+                        visitExpression(wasmBlock, tsReturnExpr);
+                    }
+
+                    wasmBlock.code.return();
+                    break;
+
                 default:
-                    Debug.fail(`Unimplemented: Unsupported statement in block '${getTextOfNode(tsStatement)}'.`);
+                    unexpectedNode(tsStatement);
+                    break;
             }
+        }
+    }
+
+    function visitNumericLiteral(wasmBlock: WasmBlock, tsExpression: NumericLiteral) {
+        let value = parseFloat(tsExpression.text);
+        wasmBlock.code.f64.const(value);
+    }
+
+    function visitExpression(wasmBlock: WasmBlock, tsExpression: Expression) {
+        switch (tsExpression.kind) {
+            case SyntaxKind.NumericLiteral:
+                visitNumericLiteral(wasmBlock, (<NumericLiteral>tsExpression));
+                break;
+            default:
+                unexpectedNode(tsExpression);
+                break;
         }
     }
 }

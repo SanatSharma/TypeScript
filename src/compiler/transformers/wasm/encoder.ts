@@ -8,6 +8,12 @@ namespace ts.wasm {
     export class Encoder {
         private _buffer: number[] = [];
 
+        /** Float64Array used by 'float64()' to extract bytes representation of a 64b float. */
+        private f64Buffer = new Float64Array(1);
+
+        /** View of 'f64Buffer' used by 'float64()' to extract bytes representation of a 64b float. */
+        private f64Bytes = new DataView(this.f64Buffer.buffer);
+
         /** Returns the array of bytes containing the encoded WebAssembly module. */
         public get buffer() { return this._buffer; }
 
@@ -16,7 +22,6 @@ namespace ts.wasm {
         /** Write the given unsigned 8b integer, as-is. */
         public uint8(u8: number) {
             assert_is_uint8(u8);
-
             this._buffer.push(u8);
         }
 
@@ -34,6 +39,12 @@ namespace ts.wasm {
             this.uint8((u32 >>> 8) & 0xFF);
             this.uint8((u32 >>> 16) & 0xFF);
             this.uint8((u32 >>> 24) & 0xFF);
+        }
+
+        public float64(f64: number) {
+            this.f64Buffer[0] = f64;
+            this.uint32(this.f64Bytes.getUint32(0, /* little-endian */ true));  // Emit bytes 0-3
+            this.uint32(this.f64Bytes.getUint32(4, /* little-endian */ true));  // Emit bytes 4-7
         }
 
         /** Write an unsigned 32b integer as LEB128. */
@@ -258,5 +269,60 @@ namespace ts.wasm {
             this.varuint32(entry.count);    // varuint32    number of local variables of the following type
             this.value_type(entry.type);    // value_type   type of the variables
         }
+    }
+
+    /** Common base for encoding numeric operations. */
+    export interface NumericOpEncoder {
+        /** Push the the given constant 'value' on to the stack. */
+        const(value: number): void;
+    }
+
+    /** Private implementation of NumericOpEncoder for encoding operations on 64b floating point numbers. */
+    class F64OpEncoder implements NumericOpEncoder {
+        constructor (private encoder: RawOpEncoder) { }
+
+        const(value: number) {
+            this.encoder.op_f64(opcode.f64_const, value);
+        }
+    }
+
+    /** Internal wrapper around 'Encoder' that surfaces helpers for writing opcodes and immediates.
+        Internally used by the public OpEncoder implementations, which expose methods to write specific
+        opcodes. */
+    class RawOpEncoder {
+        private encoder: Encoder = new Encoder();
+
+        /** Write the given opcode with no immediates. */
+        public op(opcode: opcode) {
+            this.encoder.op(opcode);
+        }
+
+        /** Write the given opcode with one 64b floating point immediate.  */
+        public op_f64(opcode: opcode, f64: number) {
+            this.encoder.op(opcode);
+            this.encoder.float64(f64);
+        }
+
+        /** Returns the array of bytes containing the encoded byte code. */
+        public get buffer() {
+            return this.encoder.buffer;
+        }
+    }
+
+    export class OpEncoder {
+        private encoder: RawOpEncoder = new RawOpEncoder();
+
+        /** Returns the NumericOpEncoder for operations on 64b floating point numbers. */
+        readonly f64: NumericOpEncoder = new F64OpEncoder(this.encoder);
+
+        /** Returns the array of bytes containing the encoded opcodes and immediates. */
+        public get buffer() { return this.encoder.buffer; }
+
+        /** Writes the 'return' opcode.  This opcode returns from the current function.  The caller
+            receives the top 0 or 1 values from the stack, according to this function's 'func_type'. */
+        public return() { this.encoder.op(opcode.return); }
+
+        /** Writes the 'end' opcode.  This opcode designates the end of a function body, block, loop, or if. */
+        public end() { this.encoder.op(opcode.end); }
     }
 }

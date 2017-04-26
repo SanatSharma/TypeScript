@@ -546,6 +546,10 @@ namespace ts.wasm {
                         switch (immediate) {
                             case "local_index : varuint32":
                                 return `\$${decoder.varuint32()}`
+                            case "value : uint64":
+                                const lowBytes = decoder.uint32();
+                                const highBytes = decoder.uint32();
+                                return `0x${hex32(highBytes)}${hex32(lowBytes)}`
                             default:
                                 Debug.fail(`Not Implemented: Unsupported opcode immediate kind '${immediate}'`);
                                 break;
