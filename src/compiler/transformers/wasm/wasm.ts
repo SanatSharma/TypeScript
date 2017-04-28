@@ -184,6 +184,20 @@ namespace ts.wasm {
 
         public get code() { return this._code; }
 
+        public loadSymbol(symbol: Symbol) {
+            const localIndex = this.locals.getIndexOf(symbol);
+            if (localIndex !== undefined) {
+                this.code.get_local(localIndex);
+                return;
+            }
+
+            Debug.fail(`Unresolved symbol '${symbol.name}'.`);
+        }
+
+        public loadIdentifier(tsIdentifier: Identifier) {
+            this.loadSymbol(this.resolver.getSymbolAtLocation(tsIdentifier));
+        }
+
         public emit(section: CodeSection) {
             Debug.assert(this.code !== undefined,
                 "A 'WasmBlock' must only be emitted once.");
@@ -285,6 +299,9 @@ namespace ts.wasm {
 
     function visitExpression(wasmBlock: WasmBlock, tsExpression: Expression) {
         switch (tsExpression.kind) {
+            case SyntaxKind.Identifier:
+                wasmBlock.loadIdentifier(<Identifier>tsExpression);
+                break;
             case SyntaxKind.NumericLiteral:
                 visitNumericLiteral(wasmBlock, (<NumericLiteral>tsExpression));
                 break;

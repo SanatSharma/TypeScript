@@ -11,11 +11,11 @@ namespace ts.wasm {
         /** Float64Array used by 'float64()' to extract bytes representation of a 64b float. */
         private f64Buffer = new Float64Array(1);
 
-        /** View of 'f64Buffer' used by 'float64()' to extract bytes representation of a 64b float. */
-        private f64Bytes = new DataView(this.f64Buffer.buffer);
-
         /** Returns the array of bytes containing the encoded WebAssembly module. */
         public get buffer() { return this._buffer; }
+
+        /** View of 'f64Buffer' used by 'float64()' to extract bytes representation of a 64b float. */
+        private f64Bytes = new DataView(this.f64Buffer.buffer);
 
         // Data Types
 
@@ -297,6 +297,12 @@ namespace ts.wasm {
             this.encoder.op(opcode);
         }
 
+        /** Write the given opcode with one varuint32 immediate. */
+        public op_vu32(opcode: opcode, immediate: number) {
+            this.encoder.op(opcode);
+            this.encoder.varuint32(immediate);
+        }
+
         /** Write the given opcode with one 64b floating point immediate.  */
         public op_f64(opcode: opcode, f64: number) {
             this.encoder.op(opcode);
@@ -312,17 +318,24 @@ namespace ts.wasm {
     export class OpEncoder {
         private encoder: RawOpEncoder = new RawOpEncoder();
 
-        /** Returns the NumericOpEncoder for operations on 64b floating point numbers. */
+        /** Operators for 64b floating point numbers. */
         readonly f64: NumericOpEncoder = new F64OpEncoder(this.encoder);
 
-        /** Returns the array of bytes containing the encoded opcodes and immediates. */
+        /** Array of bytes containing the encoded opcodes and immediates. */
         public get buffer() { return this.encoder.buffer; }
 
-        /** Writes the 'return' opcode.  This opcode returns from the current function.  The caller
-            receives the top 0 or 1 values from the stack, according to this function's 'func_type'. */
+        /** Return from the current function.  The caller receives the top 0 or 1 values from the stack,
+            according to this function's 'func_type'. */
         public return() { this.encoder.op(opcode.return); }
 
-        /** Writes the 'end' opcode.  This opcode designates the end of a function body, block, loop, or if. */
+        /** Designate the end of a block, loop, or if.
+
+            Note: Function bodies are blocks, and must terminate with an end opcode.  This may initially
+                  appear redundant with 'return'.  However, 'return' does not designate the end of a
+                  function when a function has multiple return points. */
         public end() { this.encoder.op(opcode.end); }
+
+        /** Pushes the local/function parameter with the given 'local_index' on to the stack. */
+        public get_local(local_index: number) { this.encoder.op_vu32(opcode.get_local, local_index); }
     }
 }
