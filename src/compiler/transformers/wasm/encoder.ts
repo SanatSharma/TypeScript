@@ -273,7 +273,7 @@ namespace ts.wasm {
 
     /** Common base for encoding numeric operations. */
     export interface NumericOpEncoder {
-        /** Push the the given constant 'value' on to the stack. */
+        /** Push the immediate constant 'value' on to the stack. */
         const(value: number): void;
 
         /** Replace the top two values on the stack with their sum. */
@@ -293,10 +293,8 @@ namespace ts.wasm {
     class F64OpEncoder implements NumericOpEncoder {
         constructor (private encoder: RawOpEncoder) { }
 
-        const(value: number) {
-            this.encoder.op_f64(opcode.f64_const, value);
-        }
-
+        // NumericOpEncoder implementation
+        const(value: number) { this.encoder.op_f64(opcode.f64_const, value); }
         add() { this.encoder.op(opcode.f64_add); }
         sub() { this.encoder.op(opcode.f64_sub); }
         mul() { this.encoder.op(opcode.f64_mul); }
