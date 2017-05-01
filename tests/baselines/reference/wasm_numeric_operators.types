@@ -1,0 +1,68 @@
+=== tests/cases/compiler/wasm_numeric_operators.ts ===
+
+export function add(a: number, b: number) { return a + b; }
+>add : (a: number, b: number) => number
+>a : number
+>b : number
+>a + b : number
+>a : number
+>b : number
+
+export function sub(a: number, b: number) { return a - b; }
+>sub : (a: number, b: number) => number
+>a : number
+>b : number
+>a - b : number
+>a : number
+>b : number
+
+export function mul(a: number, b: number) { return a * b; }
+>mul : (a: number, b: number) => number
+>a : number
+>b : number
+>a * b : number
+>a : number
+>b : number
+
+export function div(a: number, b: number) { return a / b; }
+>div : (a: number, b: number) => number
+>a : number
+>b : number
+>a / b : number
+>a : number
+>b : number
+
+export function precedence_mul_before_add(a: number, b: number, c: number) { return a * b + c; }
+>precedence_mul_before_add : (a: number, b: number, c: number) => number
+>a : number
+>b : number
+>c : number
+>a * b + c : number
+>a * b : number
+>a : number
+>b : number
+>c : number
+
+export function precedence_add_after_mul(a: number, b: number, c: number) { return a + b * c; }
+>precedence_add_after_mul : (a: number, b: number, c: number) => number
+>a : number
+>b : number
+>c : number
+>a + b * c : number
+>a : number
+>b * c : number
+>b : number
+>c : number
+
+export function precedence_parens(a: number, b: number, c: number) { return (a + b) * c; }
+>precedence_parens : (a: number, b: number, c: number) => number
+>a : number
+>b : number
+>c : number
+>(a + b) * c : number
+>(a + b) : number
+>a + b : number
+>a : number
+>b : number
+>c : number
+

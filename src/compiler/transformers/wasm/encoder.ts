@@ -275,6 +275,18 @@ namespace ts.wasm {
     export interface NumericOpEncoder {
         /** Push the the given constant 'value' on to the stack. */
         const(value: number): void;
+
+        /** Replace the top two values on the stack with their sum. */
+        add(): void;
+
+        /** Replace the top two values on the stack with their difference. */
+        sub(): void;
+
+        /** Replace the top two values on the stack with their product. */
+        mul(): void;
+
+        /** Replace the top two values on the stack with their quotient. */
+        div(): void;
     }
 
     /** Private implementation of NumericOpEncoder for encoding operations on 64b floating point numbers. */
@@ -284,6 +296,11 @@ namespace ts.wasm {
         const(value: number) {
             this.encoder.op_f64(opcode.f64_const, value);
         }
+
+        add() { this.encoder.op(opcode.f64_add); }
+        sub() { this.encoder.op(opcode.f64_sub); }
+        mul() { this.encoder.op(opcode.f64_mul); }
+        div() { this.encoder.op(opcode.f64_div); }
     }
 
     /** Internal wrapper around 'Encoder' that surfaces helpers for writing opcodes and immediates.
@@ -335,7 +352,7 @@ namespace ts.wasm {
                   function when a function has multiple return points. */
         public end() { this.encoder.op(opcode.end); }
 
-        /** Pushes the local/function parameter with the given 'local_index' on to the stack. */
+        /** Push the local/function parameter with the given 'local_index' on to the stack. */
         public get_local(local_index: number) { this.encoder.op_vu32(opcode.get_local, local_index); }
     }
 }

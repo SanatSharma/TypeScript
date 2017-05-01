@@ -292,6 +292,44 @@ namespace ts.wasm {
         }
     }
 
+    function visitBinaryExpression(wasmBlock: WasmBlock, tsExpression: BinaryExpression) {
+        visitExpression(wasmBlock, tsExpression.left);
+        visitExpression(wasmBlock, tsExpression.right);
+
+        const tsOperator = tsExpression.operatorToken;
+        switch (tsOperator.kind) {
+            case SyntaxKind.PlusToken:
+                wasmBlock.code.f64.add();
+                break;
+            case SyntaxKind.MinusToken:
+                wasmBlock.code.f64.sub();
+                break;
+            case SyntaxKind.AsteriskToken:
+                wasmBlock.code.f64.mul();
+                break;
+            case SyntaxKind.SlashToken:
+                wasmBlock.code.f64.div();
+                break;
+            default:
+                unexpectedNode(tsOperator);
+                break;
+        }
+    }
+
+    function visitPrefixUnaryExpression(wasmBlock: WasmBlock, tsExpression: PrefixUnaryExpression) {
+        const tsOperator = tsExpression.operator;
+        switch (tsOperator) {
+            case SyntaxKind.MinusToken:
+                wasmBlock.code.f64.const(-1);
+                visitExpression(wasmBlock, tsExpression.operand);
+                wasmBlock.code.f64.mul();
+                break;
+            default:
+                unexpectedNode(tsExpression);
+                break;
+        }
+    }
+
     function visitNumericLiteral(wasmBlock: WasmBlock, tsExpression: NumericLiteral) {
         let value = parseFloat(tsExpression.text);
         wasmBlock.code.f64.const(value);
@@ -299,8 +337,17 @@ namespace ts.wasm {
 
     function visitExpression(wasmBlock: WasmBlock, tsExpression: Expression) {
         switch (tsExpression.kind) {
+            case SyntaxKind.BinaryExpression:
+                visitBinaryExpression(wasmBlock, <BinaryExpression>tsExpression);
+                break;
+            case SyntaxKind.PrefixUnaryExpression:
+                visitPrefixUnaryExpression(wasmBlock, <PrefixUnaryExpression>tsExpression);
+                break;
             case SyntaxKind.Identifier:
                 wasmBlock.loadIdentifier(<Identifier>tsExpression);
+                break;
+            case SyntaxKind.ParenthesizedExpression:
+                visitExpression(wasmBlock, (<ParenthesizedExpression>tsExpression).expression);
                 break;
             case SyntaxKind.NumericLiteral:
                 visitNumericLiteral(wasmBlock, (<NumericLiteral>tsExpression));
