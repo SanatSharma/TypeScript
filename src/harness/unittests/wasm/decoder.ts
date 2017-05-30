@@ -207,7 +207,7 @@ namespace ts.wasm {
         public section_code() { return to_section_code(this.varuint7()); }
 
         /** Read the next 'Section' from the module (including the leading 'section_code'.) */
-        public section() {
+        public section() : Section {
             const id = this.section_code();                 // varuint7     section code
             const payload_len = this.varuint32();           // varuint32    size of this section in bytes
 

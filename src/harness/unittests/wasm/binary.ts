@@ -233,7 +233,7 @@ namespace ts.wasm {
                 const decoder = new Decoder(encoder.buffer);
 
                 // Lookup the decode functions we want to test by 'name'.
-                const decode: () => number = ((<any>decoder)[name]).bind(decoder);
+                const decode: () => T = ((<any>decoder)[name]).bind(decoder);
                 const replica = decode();
 
                 assert.deepEqual(original, replica);
