@@ -189,6 +189,27 @@ namespace ts.wasm {
         return <external_kind>value;
     }
 
+    export function NaN() {
+        let f64Buffer = new Float64Array(1);
+        let f64Bytes = new DataView(f64Buffer.buffer);
+        f64Bytes.setUint32(0, 0x7FF00000);
+        f64Bytes.setUint32(4, 0x00000001);
+        return f64Bytes;
+    }
+
+    export function Infinity() {
+        let f64Buffer = new Float64Array(1);
+        let f64Bytes = new DataView(f64Buffer.buffer);
+        f64Bytes.setUint32(0, 0x7FF00000);
+        f64Bytes.setUint32(4, 0x00000000);
+        return f64Bytes;
+    }
+    
+    export const binary_NaN = 0x7FF00000000000000001;
+    export const binary_Infinity = 0x7FF00000000000000000;
+    export const binary_NaN_string = "0x7FF00000000000000001";
+    export const binary_Infinity_string = "0x7FF00000000000000000";
+
     // Module Structure
 
     /** The module starts with a preamble  */

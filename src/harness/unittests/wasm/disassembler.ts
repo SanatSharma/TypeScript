@@ -549,7 +549,16 @@ namespace ts.wasm {
                             case "value : uint64":
                                 const lowBytes = decoder.uint32();
                                 const highBytes = decoder.uint32();
-                                return `0x${hex32(highBytes)}${hex32(lowBytes)}`
+
+                                const bytes = `0x${hex32(highBytes)}${hex32(lowBytes)}`;
+                                switch (bytes) {
+                                    case binary_NaN_string:
+                                        return bytes + " (NaN)";
+                                    case binary_Infinity_string:
+                                        return bytes + " (Infinity)"
+                                    default:
+                                        return bytes;
+                                }
                             default:
                                 Debug.fail(`Not Implemented: Unsupported opcode immediate kind '${immediate}'`);
                                 break;

@@ -276,6 +276,12 @@ namespace ts.wasm {
         /** Push the immediate constant 'value' on to the stack. */
         const(value: number): void;
 
+        /** Push NaN on to the stack */
+        const_NaN(): void;
+
+        /** Push Infinity on to the stack */
+        const_Infinity(): void;
+
         /** Replace the top two values on the stack with their sum. */
         add(): void;
 
@@ -295,6 +301,8 @@ namespace ts.wasm {
 
         // NumericOpEncoder implementation
         const(value: number) { this.encoder.op_f64(opcode.f64_const, value); }
+        const_NaN() { this.encoder.op_f64(opcode.f64_const, binary_NaN)}
+        const_Infinity() { this.encoder.op_f64(opcode.f64_const, binary_Infinity)}
         add() { this.encoder.op(opcode.f64_add); }
         sub() { this.encoder.op(opcode.f64_sub); }
         mul() { this.encoder.op(opcode.f64_mul); }

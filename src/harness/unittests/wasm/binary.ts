@@ -45,6 +45,11 @@ namespace ts.wasm {
         { variable: true, signed: true, bits: 32 }
     ];
 
+    const numericIdentifiers = [
+        NaN,
+        Infinity
+    ];
+
     /** Calculates the name for a numeric type (e.g., 'varuint7') based on the given description. */
     function numeric_type_name(type: numeric_type) {
         return (type.variable        //   If the encoding is variable length, add the "var" prefix.
@@ -152,6 +157,22 @@ namespace ts.wasm {
                         }, "'value' must be a");
                     });
                 }
+            }
+
+            /**
+             * 
+             * Checks numeric identifiers such as Infinity and NaN round-trip through encode/decode.
+             */
+            function check_numeric_identifier(value: number, encode: (value: number) => void, decode: () => number) {
+                 it(`must round-trip value ${value}`, () => {
+                    encode(value);                                              //   encode the value
+                    const actual = decode();                                    //   decode the value
+                    if (isNaN(value)) {
+                        assert.isTrue(isNaN(actual) && actual !== undefined);   //   NaN is not considered equal to NaN so use isNaN
+                    } else {
+                        assert.equal(actual, value);                            //   ensure the decoded value is equal to the original.
+                    }
+                });
             }
 
             function getEnumMembers<T>(fixture: T) {
@@ -314,6 +335,17 @@ namespace ts.wasm {
             describe("other types", () => {
                 check_enum("external_kind");
             }); // End other types
+
+            describe("numeric identifiers", () => {
+                numericIdentifiers.forEach((identifier) => {
+                    const encoder = new Encoder();
+                    const decoder = new Decoder(encoder.buffer);
+
+                    const encode: (value: number) => void = ((<any>encoder)["float64"]).bind(encoder);
+                    const decode: () => number = ((<any>decoder)["float64"]).bind(decoder);
+                    check_numeric_identifier(identifier, encode, decode);
+                });
+            });
 
             describe("module structure", () => {
                 describe("preamble", () => {

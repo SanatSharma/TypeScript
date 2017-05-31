@@ -76,6 +76,23 @@ namespace ts.wasm {
                 | (this.uint8() << 24)) >>> 0;
         }
 
+        public float64() {
+            let f64Buffer = new Float64Array(1);
+            let f64Bytes = new DataView(f64Buffer.buffer);
+            f64Bytes.setUint32(0, this.uint32(), true);
+            f64Bytes.setUint32(4, this.uint32(), true);
+
+            switch(f64Bytes.getFloat64(0, true))
+            {
+                case binary_Infinity:
+                    return Infinity;
+                case binary_NaN:
+                    return NaN;
+                default:
+                    return f64Bytes.getFloat64(0, true);
+            }
+        }
+
         /** Read a LEB128 encoded 32b unsigned integer. */
         public varuint32() {
             let result = 0;                             // Accumulator for decoded result.
