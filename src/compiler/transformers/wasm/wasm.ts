@@ -248,10 +248,13 @@ namespace ts.wasm {
         // Visit each source file, emitting it's contribution into the wasmModule.
         sourceFiles.forEach(sourceFile => visitSourceFile(wasmModule, sourceFile));
 
+        // <SANAT> get the data into the wasmEncoder from the wasmModule passed in
         // Wasm is implicitly 'noEmitOnError'.  Do not write the binary if any errors were encountered.
         if (diagnostics.getDiagnostics().length === 0) {
             const wasmEncoder = new Encoder();
             wasmModule.emit(wasmEncoder);
+            
+            // <SANAT> write out the data from the wasmEncoder to the out file
             host.writeFile(outFile, wasmEncoder.buffer, /* writeByteOrderMark: */ false);
         }
     }
